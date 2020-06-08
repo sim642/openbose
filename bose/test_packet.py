@@ -20,3 +20,4 @@ class TestPacket(TestCase):
 
     def test_from_bytes(self):
         self.assertEqual(Packet.from_bytes(bytes([2, 2, 3, 1, 50])), Packet(FunctionBlock.STATUS, StatusFunction.BATTERY_LEVEL, Operator.STATUS, bytes([50])))
+        self.assertNotEqual(Packet.from_bytes(bytes([2, 2, 3, 1, 50])), Packet(FunctionBlock.STATUS, StatusFunction.BATTERY_LEVEL, Operator.STATUS, bytes([20])))

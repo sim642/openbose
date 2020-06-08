@@ -12,6 +12,7 @@ class PacketBase:
     port: int
 
 
+@dataclass
 class PacketHeader(PacketBase):
     payload_length: int
 
@@ -41,6 +42,7 @@ class PacketHeader(PacketBase):
         )
 
 
+@dataclass
 class Packet(PacketBase):
     payload: bytes
 
