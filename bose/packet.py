@@ -65,9 +65,7 @@ class Packet(PacketBase):
         return self.header.to_bytes() + self.payload
 
     @classmethod
-    def from_bytes(cls, data: bytes) -> "Packet":
-        header = PacketHeader.from_bytes(data[:4])
-        payload = data[4:]
+    def from_header(cls, header: PacketHeader, payload: bytes) -> "Packet":
         assert len(payload) == header.payload_length
         return Packet(
             header.function_block,
@@ -77,3 +75,9 @@ class Packet(PacketBase):
             header.device_id,
             header.port
         )
+
+    @classmethod
+    def from_bytes(cls, data: bytes) -> "Packet":
+        header = PacketHeader.from_bytes(data[:4])
+        payload = data[4:]
+        return cls.from_header(header, payload)
