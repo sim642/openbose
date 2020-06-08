@@ -1,4 +1,5 @@
 from enum import IntEnum
+from typing import Type, Dict
 
 
 class FunctionBlock(IntEnum):
@@ -8,11 +9,11 @@ class FunctionBlock(IntEnum):
     # TODO: missing values
 
 
-class Function:
+class Function(IntEnum):
     pass
 
 
-class ProductInfoFunction(Function, IntEnum):
+class ProductInfoFunction(Function):
     BMAP_VERSION = 1
     PRODUCT_ID_VARIANT = 3
     FIRMWARE_VERSION = 5
@@ -20,18 +21,25 @@ class ProductInfoFunction(Function, IntEnum):
     # TODO: missing values
 
 
-class StatusFunction(Function, IntEnum):
+class StatusFunction(Function):
     BATTERY_LEVEL = 2
     # TODO: missing values
 
 
-class AudioManagementFunction(Function, IntEnum):
+class AudioManagementFunction(Function):
     SOURCE = 1
     CONTROL = 3
     STATUS = 4
     VOLUME = 5
     NOW_PLAYING = 6
     # TODO: missing values
+
+
+FUNCTION_BLOCK_FUNCTION_TYPE: Dict[FunctionBlock, Type[Function]] = {
+    FunctionBlock.PRODUCT_INFO: ProductInfoFunction,
+    FunctionBlock.STATUS: StatusFunction,
+    FunctionBlock.AUDIO_MANAGEMENT: AudioManagementFunction
+}
 
 
 class Operator(IntEnum):

@@ -17,3 +17,6 @@ class TestPacket(TestCase):
         self.assertEqual(Packet(FunctionBlock.AUDIO_MANAGEMENT, AudioManagementFunction.STATUS, Operator.GET).to_bytes(), bytes([5, 4, 1, 0]))
         self.assertEqual(Packet(FunctionBlock.AUDIO_MANAGEMENT, AudioManagementFunction.VOLUME, Operator.GET).to_bytes(), bytes([5, 5, 1, 0]))
         self.assertEqual(Packet(FunctionBlock.AUDIO_MANAGEMENT, AudioManagementFunction.NOW_PLAYING, Operator.START).to_bytes(), bytes([5, 6, 5, 0]))
+
+    def test_from_bytes(self):
+        self.assertEqual(Packet.from_bytes(bytes([2, 2, 3, 1, 50])), Packet(FunctionBlock.STATUS, StatusFunction.BATTERY_LEVEL, Operator.STATUS, bytes([50])))
