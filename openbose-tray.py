@@ -15,8 +15,7 @@ from bose import *
 
 APPINDICATOR_ID = "openbose-tray"
 
-# icon_path = os.path.abspath("headphone-symbol.svg")
-indicator = AppIndicator3.Indicator.new(APPINDICATOR_ID, Gtk.STOCK_INFO, AppIndicator3.IndicatorCategory.HARDWARE)
+indicator = AppIndicator3.Indicator.new(APPINDICATOR_ID, "audio-headphones", AppIndicator3.IndicatorCategory.HARDWARE)
 # indicator.set_title("openbose")
 indicator.set_status(AppIndicator3.IndicatorStatus.ACTIVE)
 
