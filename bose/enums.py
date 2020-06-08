@@ -8,7 +8,11 @@ class FunctionBlock(IntEnum):
     # TODO: missing values
 
 
-class ProductInfoFunction(IntEnum):
+class Function:
+    pass
+
+
+class ProductInfoFunction(Function, IntEnum):
     BMAP_VERSION = 1
     PRODUCT_ID_VARIANT = 3
     FIRMWARE_VERSION = 5
@@ -16,12 +20,12 @@ class ProductInfoFunction(IntEnum):
     # TODO: missing values
 
 
-class StatusFunction(IntEnum):
+class StatusFunction(Function, IntEnum):
     BATTERY_LEVEL = 2
     # TODO: missing values
 
 
-class AudioManagementFunction(IntEnum):
+class AudioManagementFunction(Function, IntEnum):
     SOURCE = 1
     CONTROL = 3
     STATUS = 4
