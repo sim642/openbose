@@ -40,3 +40,6 @@ with Connection(address, channel) as conn:
     # command_get(Packet(FunctionBlock.AUDIO_MANAGEMENT, AudioManagementFunction.STATUS, Operator.GET))
     # command_get(Packet(FunctionBlock.AUDIO_MANAGEMENT, AudioManagementFunction.VOLUME, Operator.GET))
     command_start(Packet(FunctionBlock.AUDIO_MANAGEMENT, AudioManagementFunction.NOW_PLAYING, Operator.START))
+
+    while read():
+        pass
