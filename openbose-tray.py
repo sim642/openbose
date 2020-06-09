@@ -20,9 +20,12 @@ indicator = AppIndicator3.Indicator.new(APPINDICATOR_ID, "audio-headphones", App
 indicator.set_status(AppIndicator3.IndicatorStatus.ACTIVE)
 
 menu = Gtk.Menu()
-item_battery = Gtk.MenuItem(label="")
+item_battery = Gtk.MenuItem(label="Battery level: ?")
 item_battery.set_sensitive(False)
 menu.append(item_battery)
+item_volume = Gtk.MenuItem(label="Volume: ?")
+item_volume.set_sensitive(False)
+menu.append(item_volume)
 menu.append(Gtk.SeparatorMenuItem())
 item_quit = Gtk.MenuItem(label="Quit")
 item_quit.connect("activate", lambda _: Gtk.main_quit())
@@ -52,6 +55,7 @@ class BoseThread(threading.Thread):
 
             write(Packet(FunctionBlock.PRODUCT_INFO, ProductInfoFunction.BMAP_VERSION, Operator.GET))
             write(Packet(FunctionBlock.STATUS, StatusFunction.BATTERY_LEVEL, Operator.GET))
+            write(Packet(FunctionBlock.AUDIO_MANAGEMENT, AudioManagementFunction.VOLUME, Operator.GET))
 
             while True:
                 packet = read()
@@ -61,9 +65,15 @@ class BoseThread(threading.Thread):
 def read_callback(packet):
     if packet.function == StatusFunction.BATTERY_LEVEL and packet.operator == Operator.STATUS:
         battery_level = packet.payload[0]
-        s = "Battery level: " + str(battery_level)
+        s = f"Battery level: {str(battery_level)}%"
         print(s)
         item_battery.set_label(s)
+    elif packet.function == AudioManagementFunction.VOLUME and packet.operator == Operator.STATUS:
+        max_volume = packet.payload[0]
+        cur_volume = packet.payload[1]
+        s = f"Volume: {(cur_volume/max_volume*100):.0f}% ({str(cur_volume)}/{str(max_volume)})"
+        print(s)
+        item_volume.set_label(s)
 
 
 bose_thread = BoseThread("4C:87:5D:53:F2:CF", 8, read_callback)
