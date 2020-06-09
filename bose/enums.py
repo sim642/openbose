@@ -4,6 +4,7 @@ from typing import Type, Dict
 
 class FunctionBlock(IntEnum):
     PRODUCT_INFO = 0
+    SETTINGS = 1
     STATUS = 2
     AUDIO_MANAGEMENT = 5
     # TODO: missing values
@@ -18,6 +19,11 @@ class ProductInfoFunction(Function):
     PRODUCT_ID_VARIANT = 3
     FIRMWARE_VERSION = 5
     SERIAL_NUMBER = 7
+    # TODO: missing values
+
+
+class SettingsFunction(Function):
+    PRODUCT_NAME = 2
     # TODO: missing values
 
 
@@ -37,6 +43,7 @@ class AudioManagementFunction(Function):
 
 FUNCTION_BLOCK_FUNCTION_TYPE: Dict[FunctionBlock, Type[Function]] = {
     FunctionBlock.PRODUCT_INFO: ProductInfoFunction,
+    FunctionBlock.SETTINGS: SettingsFunction,
     FunctionBlock.STATUS: StatusFunction,
     FunctionBlock.AUDIO_MANAGEMENT: AudioManagementFunction
 }

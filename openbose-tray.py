@@ -20,6 +20,9 @@ indicator = AppIndicator3.Indicator.new(APPINDICATOR_ID, "audio-headphones", App
 indicator.set_status(AppIndicator3.IndicatorStatus.ACTIVE)
 
 menu = Gtk.Menu()
+item_name = Gtk.MenuItem(label="?")
+item_name.set_sensitive(False)
+menu.append(item_name)
 item_battery = Gtk.MenuItem(label="Battery level: ?")
 item_battery.set_sensitive(False)
 menu.append(item_battery)
@@ -54,6 +57,7 @@ class BoseThread(threading.Thread):
                 return packet
 
             write(Packet(FunctionBlock.PRODUCT_INFO, ProductInfoFunction.BMAP_VERSION, Operator.GET))
+            write(Packet(FunctionBlock.SETTINGS, SettingsFunction.PRODUCT_NAME, Operator.GET))
             write(Packet(FunctionBlock.STATUS, StatusFunction.BATTERY_LEVEL, Operator.GET))
             write(Packet(FunctionBlock.AUDIO_MANAGEMENT, AudioManagementFunction.VOLUME, Operator.GET))
 
@@ -63,12 +67,17 @@ class BoseThread(threading.Thread):
 
 
 def read_callback(packet):
-    if packet.function == StatusFunction.BATTERY_LEVEL and packet.operator == Operator.STATUS:
+    if packet.function_block == FunctionBlock.SETTINGS and packet.function == SettingsFunction.PRODUCT_NAME and packet.operator == Operator.STATUS:
+        name = packet.payload[1:]
+        s = name.decode("utf-8")
+        print(s)
+        item_name.set_label(s)
+    elif packet.function_block == FunctionBlock.STATUS and packet.function == StatusFunction.BATTERY_LEVEL and packet.operator == Operator.STATUS:
         battery_level = packet.payload[0]
         s = f"Battery level: {str(battery_level)}%"
         print(s)
         item_battery.set_label(s)
-    elif packet.function == AudioManagementFunction.VOLUME and packet.operator == Operator.STATUS:
+    elif packet.function_block == FunctionBlock.AUDIO_MANAGEMENT and packet.function == AudioManagementFunction.VOLUME and packet.operator == Operator.STATUS:
         max_volume = packet.payload[0]
         cur_volume = packet.payload[1]
         s = f"Volume: {(cur_volume/max_volume*100):.0f}% ({str(cur_volume)}/{str(max_volume)})"
