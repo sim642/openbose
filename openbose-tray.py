@@ -74,6 +74,7 @@ class BoseThread(threading.Thread):
 notification_volume = Notify.Notification.new("Volume", None, "audio-headphones")
 notification_volume.set_category("device")
 notification_volume.set_hint("synchronous", GLib.Variant.new_string("volume")) # is this necessary?
+notification_volume.set_hint("transient", GLib.Variant.new_boolean(True)) # no notification logging
 notification_battery_level = Notify.Notification.new("Battery level", None, "audio-headphones")
 notification_battery_level.set_category("device")
 
