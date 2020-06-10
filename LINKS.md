@@ -73,3 +73,10 @@
         * [Python reimplementation](https://github.com/pmrv/brightnessicon/blob/396a1164f8edb829bfa0e93d84e5aabf97246974/brightnessicon#L70)
     * [AyatanaIdo3.ScaleMenuItem](https://lazka.github.io/pgi-docs/#AyatanaIdo3-0.4/classes/ScaleMenuItem.html)
         * [ayatana-ido/idoscalemenuitem.c](https://github.com/AyatanaIndicators/ayatana-ido/blob/master/src/idoscalemenuitem.c)
+* Notifications
+    * [Specification](https://developer.gnome.org/notification-spec/)
+    * [Step-by-step Python guide](http://candidtim.github.io/appindicator/2014/09/13/ubuntu-appindicator-step-by-step.html)
+    * Progress bar/gauge
+        * [notify-send](https://ubuntuforums.org/showthread.php?t=1776148)
+        * [Python](https://stackoverflow.com/a/41890837/854540)
+        * [Summary & body not shown in xfce4-notifyd](https://gitlab.xfce.org/apps/xfce4-notifyd/-/issues/4)
