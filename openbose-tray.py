@@ -4,7 +4,7 @@ from gi.repository import Gtk
 gi.require_version("AppIndicator3", "0.1")
 from gi.repository import AppIndicator3
 
-from gi.repository import GLib
+from gi.repository import GLib, Gdk
 
 import os.path
 import signal
@@ -34,6 +34,56 @@ menu.append(item_battery)
 item_volume = Gtk.MenuItem(label="Volume: ?")
 item_volume.set_sensitive(False)
 menu.append(item_volume)
+menu.append(Gtk.SeparatorMenuItem())
+
+scale = Gtk.Scale.new_with_range(Gtk.Orientation.HORIZONTAL, 0, 100, 10)
+scale.set_draw_value(False)
+scale.set_value(50)
+scale.set_increments(2, 10)
+scale.connect("value-changed", lambda _: print(scale.get_value()))
+item_scale = Gtk.MenuItem()
+grabbed = False
+def item_scale_button_press_event(item, event):
+    global grabbed
+    # print(item, event)
+    allocation = scale.get_allocation()
+    x, y = item.translate_coordinates(scale, event.x, event.y)
+    if x > 0 and x < allocation.width and y > 0 and y < allocation.width:
+        scale.event(event)
+    grabbed = True
+    return True
+def item_scale_button_release_event(item, event):
+    global grabbed
+    # print(item, event)
+    scale.event(event)
+    grabbed = False
+    return True
+def item_scale_motion_notify_event(item, event):
+    global grabbed
+    # print(item, event)
+    allocation = scale.get_allocation()
+    x, y = item.translate_coordinates(scale, event.x, event.y)
+    if not grabbed:
+        event.x = x
+        event.y = y
+    if grabbed or (x > 0 and x < allocation.width and y > 0 and y < allocation.width):
+        scale.event(event)
+    return True
+def item_scale_grab_broken_event(item, event):
+    scale.grab_broken_event(event)
+    return True
+def item_scale_scroll_event(item, event):
+    scale.event(event)
+    return True
+item_scale.add_events(Gdk.EventMask.SCROLL_MASK | Gdk.EventMask.POINTER_MOTION_MASK | Gdk.EventMask.BUTTON_MOTION_MASK)
+item_scale.connect("button-press-event", item_scale_button_press_event)
+item_scale.connect("button-release-event", item_scale_button_release_event)
+item_scale.connect("motion-notify-event", item_scale_motion_notify_event)
+item_scale.connect("grab-broken-event", item_scale_grab_broken_event)
+item_scale.connect("scroll-event", item_scale_scroll_event)
+item_scale.add(scale)
+menu.append(item_scale)
+
 menu.append(Gtk.SeparatorMenuItem())
 item_quit = Gtk.MenuItem(label="Quit")
 item_quit.connect("activate", lambda _: Gtk.main_quit())
