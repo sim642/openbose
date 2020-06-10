@@ -19,6 +19,11 @@ indicator = AppIndicator3.Indicator.new(APPINDICATOR_ID, "audio-headphones", App
 # indicator.set_title("openbose")
 indicator.set_status(AppIndicator3.IndicatorStatus.ACTIVE)
 
+status_icon = Gtk.StatusIcon.new_from_icon_name("audio-headphones")
+status_icon.set_name("name")
+status_icon.set_title("title")
+status_icon.set_tooltip_text("tooltip")
+
 menu = Gtk.Menu()
 item_name = Gtk.MenuItem(label="?")
 item_name.set_sensitive(False)
@@ -34,7 +39,22 @@ item_quit = Gtk.MenuItem(label="Quit")
 item_quit.connect("activate", lambda _: Gtk.main_quit())
 menu.append(item_quit)
 menu.show_all()
+
 indicator.set_menu(menu)
+
+def popup_menu(icon, button, time):
+    menu.popup(None, None, Gtk.StatusIcon.position_menu, icon, button, time)
+status_icon.connect("popup-menu", popup_menu)
+
+def activate(icon):
+    event = Gtk.get_current_event().button
+    menu.popup(None, None, Gtk.StatusIcon.position_menu, icon, event.button, event.time)
+status_icon.connect("activate", activate)
+
+# def button_press(icon, event):
+#     if event.button == 1:
+#         menu.popup(None, None, Gtk.StatusIcon.position_menu, icon, event.button, event.time)
+# status_icon.connect("button-press-event", button_press)
 
 
 class BoseThread(threading.Thread):
