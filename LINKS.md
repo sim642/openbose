@@ -76,10 +76,11 @@
 * Notifications
     * [Specification](https://developer.gnome.org/notification-spec/)
     * [Step-by-step Python guide](http://candidtim.github.io/appindicator/2014/09/13/ubuntu-appindicator-step-by-step.html)
-    * Progress bar/gauge
-        * [notify-send](https://ubuntuforums.org/showthread.php?t=1776148)
+    * Progress bar/gauge, `value` hint
+        * [notify-send, `synchronous` hint](https://ubuntuforums.org/showthread.php?t=1776148)
         * [Python](https://stackoverflow.com/a/41890837/854540)
         * [Summary & body not shown in xfce4-notifyd](https://gitlab.xfce.org/apps/xfce4-notifyd/-/issues/4)
+        * [xfce4-pulseaudio-plugin, `x-canonical-private-synchronous` hint](https://gitlab.xfce.org/panel-plugins/xfce4-pulseaudio-plugin/-/blob/fd1e12412eec41a5cd787321f90222fd07da976c/panel-plugin/pulseaudio-notify.c#L229-231)
     * No logging, `transient` hint
         * [xfce4-pulseaudio-plugin](https://gitlab.xfce.org/panel-plugins/xfce4-pulseaudio-plugin/-/blob/fd1e12412eec41a5cd787321f90222fd07da976c/panel-plugin/pulseaudio-notify.c#L141)
         * [xfce4-notifyd](https://gitlab.xfce.org/apps/xfce4-notifyd/-/blob/1d31872548887bfd5faf20fed136e68031fa98f0/xfce4-notifyd/xfce-notify-daemon.c#L1246)
