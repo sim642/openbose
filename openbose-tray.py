@@ -20,6 +20,12 @@ NOTIFY_ID = "openbose-tray"
 
 Notify.init(NOTIFY_ID)
 
+
+def quit():
+    Notify.uninit()
+    Gtk.main_quit()
+
+
 indicator = AppIndicator3.Indicator.new(APPINDICATOR_ID, "audio-headphones", AppIndicator3.IndicatorCategory.HARDWARE)
 # indicator.set_title("openbose")
 indicator.set_status(AppIndicator3.IndicatorStatus.ACTIVE)
@@ -36,7 +42,7 @@ item_volume.set_sensitive(False)
 menu.append(item_volume)
 menu.append(Gtk.SeparatorMenuItem())
 item_quit = Gtk.MenuItem(label="Quit")
-item_quit.connect("activate", lambda _: Gtk.main_quit())
+item_quit.connect("activate", lambda _: quit())
 menu.append(item_quit)
 menu.show_all()
 indicator.set_menu(menu)
@@ -66,9 +72,12 @@ class BoseThread(threading.Thread):
             write(Packet(FunctionBlock.STATUS, StatusFunction.BATTERY_LEVEL, Operator.GET))
             write(Packet(FunctionBlock.AUDIO_MANAGEMENT, AudioManagementFunction.VOLUME, Operator.GET))
 
-            while True:
-                packet = read()
-                GLib.idle_add(self.read_callback, packet)
+            try:
+                while True:
+                    packet = read()
+                    GLib.idle_add(self.read_callback, packet)
+            except ConnectionResetError as e:
+                quit()
 
 
 notification_volume = Notify.Notification.new("openbose", None, "audio-headphones")
