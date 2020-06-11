@@ -30,15 +30,20 @@ indicator = AppIndicator3.Indicator.new(APPINDICATOR_ID, "audio-headphones", App
 # indicator.set_title("openbose")
 indicator.set_status(AppIndicator3.IndicatorStatus.ACTIVE)
 
+
+class TextMenuItem(Gtk.MenuItem):
+    def __init__(self, label: str):
+        super().__init__()
+        self.set_sensitive(False)
+        self.set_label(label)
+
+
 menu = Gtk.Menu()
-item_name = Gtk.MenuItem(label="?")
-item_name.set_sensitive(False)
+item_name = TextMenuItem(label="?")
 menu.append(item_name)
-item_battery = Gtk.MenuItem(label="Battery level: ?")
-item_battery.set_sensitive(False)
+item_battery = TextMenuItem(label="Battery level: ?")
 menu.append(item_battery)
-item_volume = Gtk.MenuItem(label="Volume: ?")
-item_volume.set_sensitive(False)
+item_volume = TextMenuItem(label="Volume: ?")
 menu.append(item_volume)
 menu.append(Gtk.SeparatorMenuItem())
 item_quit = Gtk.MenuItem(label="Quit")
