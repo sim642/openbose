@@ -38,14 +38,23 @@
     * [org.mpris.Mediaplyer2 discovery by prefix](https://stackoverflow.com/a/20961735/854540)
 * [Linux Bluetooth stack overview](https://opensourceforu.com/2015/06/linux-without-wires-the-basics-of-bluetooth/)
 * BlueZ
+    * [BlueZ 5 guide](http://www.bluez.org/bluez-5-api-introduction-and-porting-guide/)
     * D-Bus `org.bluez.Battery1`
         * [battery-api.txt](https://git.kernel.org/pub/scm/bluetooth/bluez.git/tree/doc/battery-api.txt)
         * [bluez/battery.c](https://github.com/hadess/bluez/blob/477ecca127c529611adbc53f08039cefaf86305d/profiles/battery/battery.c#L55)
     * D-Bus `org.bluez.ProfileManager1`
         * [BlueZ 5.0](https://lwn.net/Articles/531133/)
         * [profile-api.txt](https://git.kernel.org/pub/scm/bluetooth/bluez.git/tree/doc/profile-api.txt)
+        * [test-profile](https://kernel.googlesource.com/pub/scm/bluetooth/bluez/+/5.6/test/test-profile)
         * [Profile registration in Python](https://stackoverflow.com/questions/52558519/bluez-profile-registration)
-        * [Profile registration in C#?](https://blog.mrgibbs.io/bluetooth-profile-with-bluez-mono/)
+            * [With I/O](https://ukbaz.github.io/howto/AppInventor.html)
+                * [R/W opening issue in Python](https://bugs.python.org/issue20074)
+            * [With service record](https://scribles.net/setting-up-bluetooth-serial-port-profile-on-raspberry-pi-using-d-bus-api/)
+        * [Profile registration in C#](https://blog.mrgibbs.io/bluetooth-profile-with-bluez-mono/)
+    * D-Bus `org.bluez.Device1`
+        * [device-api.txt](https://git.kernel.org/pub/scm/bluetooth/bluez.git/tree/doc/device-api.txt)
+        * [list-devices](https://git.kernel.org/pub/scm/bluetooth/bluez.git/tree/test/list-devices)
+        * [Listing & discovering devices in C#](https://blog.mrgibbs.io/bluetooth-pairing-with-bluez-and-dbus/)
 
 
 # GUI (GTK)
