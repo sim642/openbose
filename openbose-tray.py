@@ -80,14 +80,38 @@ class BoseThread(threading.Thread):
                 quit()
 
 
-notification_volume = Notify.Notification.new("openbose", None, "audio-headphones")
+class MyNotification(Notify.Notification):
+    def __init__(self, summary: str, body: str = None, icon: str = None):
+        super().__init__()
+        self.update(summary, body, icon)
+
+    def set_summary(self, summary: str):
+        self.set_property("summary", summary)
+
+    def set_body(self, body: str = None):
+        self.set_property("body", body)
+
+    def set_transient(self, transient: bool):
+        """Sets notification logging."""
+        self.set_hint("transient", GLib.Variant.new_boolean(transient))
+
+
+class GaugeNotification(MyNotification):
+    def __init__(self, summary: str, body: str = None, icon: str = None):
+        super().__init__(summary, body, icon)
+        self.set_hint("synchronous", GLib.Variant.new_string("volume"))  # what does this value mean?
+        self.set_hint("x-canonical-private-synchronous", GLib.Variant.new_string(""))
+
+    def set_value(self, value: int):
+        self.set_hint("value", GLib.Variant.new_int32(value))
+
+
+notification_volume = GaugeNotification("openbose", None, "audio-headphones")
 notification_volume.set_category("device")
-notification_volume.set_hint("synchronous", GLib.Variant.new_string("volume")) # what does this value mean?
-notification_volume.set_hint("x-canonical-private-synchronous", GLib.Variant.new_string(""))
-notification_volume.set_hint("transient", GLib.Variant.new_boolean(True)) # no notification logging
-notification_battery_level = Notify.Notification.new("openbose", None, "audio-headphones")
+notification_volume.set_transient(True)
+notification_battery_level = MyNotification("openbose", None, "audio-headphones")
 notification_battery_level.set_category("device")
-notification_disconnect = Notify.Notification.new("openbose", "Disconnected", "audio-headphones")
+notification_disconnect = MyNotification("openbose", "Disconnected", "audio-headphones")
 notification_disconnect.set_category("device.removed")
 
 
@@ -98,16 +122,16 @@ def read_callback(packet):
         print(s)
         item_name.set_label(s)
 
-        notification_volume.set_property("summary", s)
-        notification_battery_level.set_property("summary", s)
-        notification_disconnect.set_property("summary", s)
+        notification_volume.set_summary(s)
+        notification_battery_level.set_summary(s)
+        notification_disconnect.set_summary(s)
     elif packet.function_block == FunctionBlock.STATUS and packet.function == StatusFunction.BATTERY_LEVEL and packet.operator == Operator.STATUS:
         battery_level = packet.payload[0]
         s = f"Battery level: {str(battery_level)}%"
         print(s)
         item_battery.set_label(s)
 
-        notification_battery_level.set_property("body", s)
+        notification_battery_level.set_body(s)
         notification_battery_level.show()
     elif packet.function_block == FunctionBlock.AUDIO_MANAGEMENT and packet.function == AudioManagementFunction.VOLUME and packet.operator == Operator.STATUS:
         max_volume = packet.payload[0]
@@ -117,8 +141,8 @@ def read_callback(packet):
         print(s)
         item_volume.set_label(s)
 
-        notification_volume.set_property("body", s) # just in case if notifyd doesn't support value
-        notification_volume.set_hint("value", GLib.Variant.new_int32(volume_percent))
+        notification_volume.set_body(s) # just in case if notifyd doesn't support value
+        notification_volume.set_value(volume_percent)
         notification_volume.show()
     elif packet.function_block == FunctionBlock.DEVICE_MANAGEMENT and packet.function == DeviceManagementFunction.DISCONNECT and packet.operator == Operator.PROCESSING:
         notification_disconnect.show()
