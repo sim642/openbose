@@ -1,0 +1,65 @@
+>>> data = bytes([1, 9, 113, 18, 177, 27, 65, 149, 232, 52, 213, 174, 45, 195, 82])
+>>> len(data)
+15
+>>> new_data = data[:4] + mac + data[9:]
+Traceback (most recent call last):
+  File "<stdin>", line 1, in <module>
+NameError: name 'mac' is not defined
+>>> mac = bytes([0x4C, 0x87, 0x5D, 0x53, 0xF2, 0xCF])
+>>> new_data = data[:4] + mac + data[9:]
+>>> len(new_data)
+16
+>>> import hashlib
+>>> m = hashlib.sha256()
+>>> m.update(new_data)
+>>> mac_hash = m.digest()
+>>> mac_hash
+b'\xeb~{\xbex\xa32\xc5\xf0R(_\xbf\x0fcz\t\x05V\x84F{\x1d[\xc8)aru\x17\x91\xa4'
+>>> partial_mac_hash = data[4:9]
+>>> len(partial_mac_hash)
+5
+>>> partial_mac_hash
+b'\xb1\x1bA\x95\xe8'
+>>> mac_hash.find
+<built-in method find of bytes object at 0x7f3756efeb28>
+>>> mac_hash.find(partial_mac_hash)
+-1
+>>> mac_hash.hex()
+'eb7e7bbe78a332c5f052285fbf0f637a09055684467b1d5bc8296172751791a4'
+>>> partial_mac_hash.hex()
+'b11b4195e8'
+>>> mac_hash.hex().find(partial_mac_hash.hex())
+-1
+>>> m = hashlib.sha256()
+>>> m.update(new_data.hex().
+KeyboardInterrupt
+>>> "asd".upper()
+'ASD'
+>>> 
+KeyboardInterrupt
+>>> m.update(new_data.hex().upper().encode("utf-8"))
+>>> mac_hash = m.digest()
+>>> mac_hash.hex()
+'706ab38a92dfe794d030e076f2bf33c2acb11b4195e8be7881cab1a917e535b5'
+>>> mac_hash.hex().find(partial_mac_hash.hex())
+34
+>>> mac_hash.find(partial_mac_hash)
+17
+>>> data[2]
+113
+>>> (data[2] >> 4) & 1
+1
+>>> (data[2] >> 5) & 1
+1
+>>> (data[2] >> 2) & 1
+0
+>>> (data[2] >> 2) & 1
+KeyboardInterrupt
+>>> data.hex()
+'01097112b11b4195e834d5ae2dc352'
+>>> data[9:12]
+b'4\xd5\xae'
+>>> data[9:12].hex()
+'34d5ae'
+>>> data[12:15].hex()
+'2dc352'
