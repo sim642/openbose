@@ -14,12 +14,15 @@ FUNCTION_BLOCK_FUNCTION_OPERATOR_PACKET_TYPE: Dict[FunctionBlock, Dict[Tuple[Fun
 
 
 def refine_packet(packet: Packet) -> "Packet":
-    packet_type = FUNCTION_BLOCK_FUNCTION_OPERATOR_PACKET_TYPE[packet.function_block][(packet.function, packet.operator)]
-    return packet_type(
-        packet.function_block,
-        packet.function,
-        packet.operator,
-        packet.payload,
-        packet.device_id,
-        packet.port
-    )
+    packet_type = FUNCTION_BLOCK_FUNCTION_OPERATOR_PACKET_TYPE.get(packet.function_block, {}).get((packet.function, packet.operator))
+    if packet_type is not None:
+        return packet_type(
+            packet.function_block,
+            packet.function,
+            packet.operator,
+            packet.payload,
+            packet.device_id,
+            packet.port
+        )
+    else:
+        return packet
