@@ -1,7 +1,8 @@
 import socket
 from typing import BinaryIO
 
-from bose import Packet, packetparser
+import bose.packets
+from bose import Packet
 from bose.packet import PacketHeader
 
 
@@ -19,7 +20,7 @@ class ConnectionBase:
         header = PacketHeader.from_bytes(self.io.read(4))
         payload = self.io.read(header.payload_length)
         packet = Packet.from_header(header, payload)
-        return packetparser.refine_packet(packet)
+        return bose.packets.refine_packet(packet)
 
 
 class Connection(ConnectionBase):
