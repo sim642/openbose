@@ -18,8 +18,8 @@ class ConnectionBase:
     def read(self) -> Packet:
         header = PacketHeader.from_bytes(self.io.read(4))
         payload = self.io.read(header.payload_length)
-        # return Packet.from_header(header, payload)
-        return packetparser.from_header(header, payload)
+        packet = Packet.from_header(header, payload)
+        return packetparser.refine_packet(packet)
 
 
 class Connection(ConnectionBase):

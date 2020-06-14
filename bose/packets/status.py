@@ -1,6 +1,6 @@
-from dataclasses import dataclass
+from typing import Dict, Tuple, Type
 
-from bose import Packet, FunctionBlock, Function, Operator, AudioManagementFunction, StatusFunction
+from bose import Packet, FunctionBlock, Operator, StatusFunction
 
 
 class BatteryLevelGetPacket(Packet):
@@ -14,6 +14,6 @@ class BatteryLevelStatusPacket(Packet):
         return self.payload[0]
 
 
-MAP = {
+FUNCTION_OPERATOR_PACKET_TYPE: Dict[Tuple[StatusFunction, Operator], Type[Packet]] = {
     (StatusFunction.BATTERY_LEVEL, Operator.STATUS): BatteryLevelStatusPacket
 }

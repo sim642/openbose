@@ -1,4 +1,6 @@
-from bose import Packet, FunctionBlock, Function, Operator, AudioManagementFunction
+from typing import Dict, Tuple, Type
+
+from bose import Packet, FunctionBlock, Operator, AudioManagementFunction
 
 
 class VolumeGetPacket(Packet):
@@ -21,6 +23,6 @@ class VolumeStatusPacket(Packet):
         return self.payload[1]
 
 
-MAP = {
+FUNCTION_OPERATOR_PACKET_TYPE: Dict[Tuple[AudioManagementFunction, Operator], Type[Packet]] = {
     (AudioManagementFunction.VOLUME, Operator.STATUS): VolumeStatusPacket
 }

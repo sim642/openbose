@@ -1,3 +1,5 @@
+from typing import Dict, Tuple, Type
+
 from bose import Packet, FunctionBlock, Operator, ProductInfoFunction
 
 
@@ -12,6 +14,6 @@ class BmapVersionStatusPacket(Packet):
         return self.payload.decode("utf-8")
 
 
-MAP = {
+FUNCTION_OPERATOR_PACKET_TYPE: Dict[Tuple[ProductInfoFunction, Operator], Type[Packet]] = {
     (ProductInfoFunction.BMAP_VERSION, Operator.STATUS): BmapVersionStatusPacket
 }

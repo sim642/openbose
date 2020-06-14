@@ -1,5 +1,6 @@
-from bose import Packet, FunctionBlock, Function, Operator, AudioManagementFunction, ProductInfoFunction, \
-    SettingsFunction
+from typing import Dict, Tuple, Type
+
+from bose import Packet, FunctionBlock, Operator, SettingsFunction
 
 
 class ProductNameGetPacket(Packet):
@@ -17,6 +18,6 @@ class ProductNameStatusPacket(Packet):
         return self.payload[1:].decode("utf-8")
 
 
-MAP = {
+FUNCTION_OPERATOR_PACKET_TYPE: Dict[Tuple[SettingsFunction, Operator], Type[Packet]] = {
     (SettingsFunction.PRODUCT_NAME, Operator.STATUS): ProductNameStatusPacket
 }
