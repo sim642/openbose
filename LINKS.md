@@ -55,6 +55,7 @@
         * [device-api.txt](https://git.kernel.org/pub/scm/bluetooth/bluez.git/tree/doc/device-api.txt)
         * [list-devices](https://git.kernel.org/pub/scm/bluetooth/bluez.git/tree/test/list-devices)
         * [Listing & discovering devices in C#](https://blog.mrgibbs.io/bluetooth-pairing-with-bluez-and-dbus/)
+    * [BLE slides](https://elinux.org/images/3/32/Doing_Bluetooth_Low_Energy_on_Linux.pdf)
 
 
 # GUI (GTK)

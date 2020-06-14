@@ -1,4 +1,7 @@
 import gi
+
+from bose.packets import productinfo, settings, status, audiomanagement, devicemanagement
+
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gtk
 gi.require_version("AppIndicator3", "0.1")
@@ -72,10 +75,10 @@ class BoseThread(threading.Thread):
                 print("<--", packet)
                 return packet
 
-            write(Packet(FunctionBlock.PRODUCT_INFO, ProductInfoFunction.BMAP_VERSION, Operator.GET))
-            write(Packet(FunctionBlock.SETTINGS, SettingsFunction.PRODUCT_NAME, Operator.GET))
-            write(Packet(FunctionBlock.STATUS, StatusFunction.BATTERY_LEVEL, Operator.GET))
-            write(Packet(FunctionBlock.AUDIO_MANAGEMENT, AudioManagementFunction.VOLUME, Operator.GET))
+            write(productinfo.BmapVersionGetPacket())
+            write(settings.ProductNameGetPacket())
+            write(status.BatteryLevelGetPacket())
+            write(audiomanagement.VolumeGetPacket())
 
             try:
                 while True:
@@ -120,37 +123,55 @@ notification_disconnect = MyNotification("openbose", "Disconnected", "audio-head
 notification_disconnect.set_category("device.removed")
 
 
+def read_product_name_status(packet: settings.ProductNameStatusPacket):
+    name = packet.product_name
+    s = name
+    print(s)
+    item_name.set_label(s)
+    notification_volume.set_summary(s)
+    notification_battery_level.set_summary(s)
+    notification_disconnect.set_summary(s)
+
+
+def read_battery_level_status(packet: status.BatteryLevelStatusPacket):
+    battery_level = packet.battery_level
+    s = f"Battery level: {str(battery_level)}%"
+    print(s)
+    item_battery.set_label(s)
+    notification_battery_level.set_body(s)
+    notification_battery_level.show()
+
+
+def read_volume_status(packet: audiomanagement.VolumeStatusPacket):
+    max_volume = packet.max_volume
+    cur_volume = packet.cur_volume
+    volume_percent = round(cur_volume / max_volume * 100)
+    s = f"Volume: {volume_percent}% ({str(cur_volume)}/{str(max_volume)})"
+    print(s)
+    item_volume.set_label(s)
+    notification_volume.set_body(s)  # just in case if notifyd doesn't support value
+    notification_volume.set_value(volume_percent)
+    notification_volume.show()
+
+
+def read_disconnect_processing(packet: devicemanagement.DisconnectProcessingPacket):
+    notification_disconnect.show()
+
+
+MAP = {
+    settings.ProductNameStatusPacket: read_product_name_status,
+    status.BatteryLevelStatusPacket: read_battery_level_status,
+    audiomanagement.VolumeStatusPacket: read_volume_status,
+    devicemanagement.DisconnectProcessingPacket: read_disconnect_processing
+}
+
+
+def read_unhandled(packet):
+    pass
+
+
 def read_callback(packet):
-    if packet.function_block == FunctionBlock.SETTINGS and packet.function == SettingsFunction.PRODUCT_NAME and packet.operator == Operator.STATUS:
-        name = packet.payload[1:]
-        s = name.decode("utf-8")
-        print(s)
-        item_name.set_label(s)
-
-        notification_volume.set_summary(s)
-        notification_battery_level.set_summary(s)
-        notification_disconnect.set_summary(s)
-    elif packet.function_block == FunctionBlock.STATUS and packet.function == StatusFunction.BATTERY_LEVEL and packet.operator == Operator.STATUS:
-        battery_level = packet.payload[0]
-        s = f"Battery level: {str(battery_level)}%"
-        print(s)
-        item_battery.set_label(s)
-
-        notification_battery_level.set_body(s)
-        notification_battery_level.show()
-    elif packet.function_block == FunctionBlock.AUDIO_MANAGEMENT and packet.function == AudioManagementFunction.VOLUME and packet.operator == Operator.STATUS:
-        max_volume = packet.payload[0]
-        cur_volume = packet.payload[1]
-        volume_percent = round(cur_volume / max_volume * 100)
-        s = f"Volume: {volume_percent}% ({str(cur_volume)}/{str(max_volume)})"
-        print(s)
-        item_volume.set_label(s)
-
-        notification_volume.set_body(s) # just in case if notifyd doesn't support value
-        notification_volume.set_value(volume_percent)
-        notification_volume.show()
-    elif packet.function_block == FunctionBlock.DEVICE_MANAGEMENT and packet.function == DeviceManagementFunction.DISCONNECT and packet.operator == Operator.PROCESSING:
-        notification_disconnect.show()
+    MAP.get(type(packet), read_unhandled)(packet)
 
 
 bose_thread = BoseThread("4C:87:5D:53:F2:CF", 8, read_callback)
