@@ -18,6 +18,10 @@ import os.path
 import signal
 import threading
 
+import logging
+
+logging.basicConfig(level=logging.DEBUG, format="%(asctime)s %(name)s %(levelname)s %(mac_address)s %(message)s")
+
 
 from bose import *
 
@@ -45,17 +49,19 @@ class BoseThread(threading.Thread):
         self.address = address
         self.channel = channel
         self.read_callback = read_callback
+        
+        self.logger = logging.LoggerAdapter(logging.getLogger("BoseThread"), {"mac_address": address})
 
     def run(self) -> None:
         with Connection(self.address, self.channel) as conn:
 
             def write(packet: Packet):
-                print("-->", packet)
+                self.logger.debug("--> %s", packet)
                 conn.write(packet)
 
             def read() -> Packet:
                 packet = conn.read()
-                print("<--", packet)
+                self.logger.debug("<-- %s", packet)
                 return packet
 
             write(productinfo.BmapVersionGetPacket())
@@ -69,7 +75,7 @@ class BoseThread(threading.Thread):
                     GLib.idle_add(self.read_callback, packet)
             except ConnectionResetError as e:
                 # quit()
-                pass
+                self.logger.info("disconnected", exc_info=e)
 
 
 class MyNotification(Notify.Notification):
@@ -151,10 +157,12 @@ class BoseController:
             devicemanagement.DisconnectProcessingPacket: self.read_disconnect_processing,
         }
 
+        self.logger = logging.LoggerAdapter(logging.getLogger("BoseController"), {"mac_address": mac_address})
+
     def read_product_name_status(self, packet: settings.ProductNameStatusPacket):
         name = packet.product_name
         s = name
-        print(s)
+        self.logger.info(s)
         self.item_name.set_label(s)
         self.notification_volume.set_summary(s)
         self.notification_battery_level.set_summary(s)
@@ -163,7 +171,7 @@ class BoseController:
     def read_battery_level_status(self, packet: status.BatteryLevelStatusPacket):
         battery_level = packet.battery_level
         s = f"Battery level: {str(battery_level)}%"
-        print(s)
+        self.logger.info(s)
         self.item_battery.set_label(s)
         self.notification_battery_level.set_body(s)
         self.notification_battery_level.show()
@@ -173,7 +181,7 @@ class BoseController:
         cur_volume = packet.cur_volume
         volume_percent = round(cur_volume / max_volume * 100)
         s = f"Volume: {volume_percent}% ({str(cur_volume)}/{str(max_volume)})"
-        print(s)
+        self.logger.info(s)
         self.item_volume.set_label(s)
         self.notification_volume.set_body(s)  # just in case if notifyd doesn't support value
         self.notification_volume.set_value(volume_percent)
@@ -209,6 +217,9 @@ system_bus = dbus.SystemBus()
 
 
 class DeviceWatcher:
+
+    def __init__(self):
+        self.logger = logging.getLogger("DeviceWatcher")
 
     def start(self):
         self.find_current()
@@ -257,7 +268,7 @@ class DeviceWatcher:
     def device_connected(self, object_path):
         device = dbus.Interface(system_bus.get_object(BLUEZ_BUS, object_path), PROPERTIES_INTERFACE)
         mac_address = device.Get(DEVICE_INTERFACE, "Address")
-        print(f"{mac_address} connected")
+        self.logger.info("connected", extra={"mac_address": mac_address})
 
         if mac_address in bose_devices:
             controller = BoseController(mac_address)
@@ -266,7 +277,7 @@ class DeviceWatcher:
     def device_disconnected(self, object_path):
         device = dbus.Interface(system_bus.get_object(BLUEZ_BUS, object_path), PROPERTIES_INTERFACE)
         mac_address = device.Get(DEVICE_INTERFACE, "Address")
-        print(f"{mac_address} disconnected")
+        self.logger.info("disconnected", extra={"mac_address": mac_address})
 
 
 device_watcher = DeviceWatcher()
