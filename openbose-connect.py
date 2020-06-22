@@ -11,6 +11,9 @@ from gi.repository import GLib
 gi.require_version("Notify", "0.7")
 from gi.repository import Notify
 
+import dbus
+import dbus.mainloop.glib
+
 import os.path
 import signal
 import threading
@@ -65,7 +68,8 @@ class BoseThread(threading.Thread):
                     packet = read()
                     GLib.idle_add(self.read_callback, packet)
             except ConnectionResetError as e:
-                quit()
+                # quit()
+                pass
 
 
 class MyNotification(Notify.Notification):
@@ -113,7 +117,7 @@ class BoseController:
     def __init__(self, mac_address: str):
         self.mac_address = mac_address
 
-        self.indicator = AppIndicator3.Indicator.new(APPINDICATOR_ID, "audio-headphones",
+        self.indicator = AppIndicator3.Indicator.new(APPINDICATOR_ID + mac_address, "audio-headphones",
                                                      AppIndicator3.IndicatorCategory.HARDWARE)
         # self.indicator.set_title("openbose")
         self.indicator.set_status(AppIndicator3.IndicatorStatus.ACTIVE)
@@ -177,6 +181,7 @@ class BoseController:
 
     def read_disconnect_processing(self, packet: devicemanagement.DisconnectProcessingPacket):
         self.notification_disconnect.show()
+        del self.indicator
 
     def read_unhandled(self, packet: Packet):
         pass
@@ -190,8 +195,82 @@ class BoseController:
         self.bose_thread.start()
 
 
-controller = BoseController("4C:87:5D:53:F2:CF")
-controller.connect()
+BLUEZ_BUS = "org.bluez"
+OBJECT_MANAGER_INTERFACE = "org.freedesktop.DBus.ObjectManager"
+PROPERTIES_INTERFACE = "org.freedesktop.DBus.Properties"
+DEVICE_INTERFACE = "org.bluez.Device1"
+
+SPP_UUID = "00001101-0000-1000-8000-00805f9b34fb"
+
+bose_devices = {"4C:87:5D:53:F2:CF"}
+
+dbus.mainloop.glib.DBusGMainLoop(set_as_default=True)
+system_bus = dbus.SystemBus()
+
+
+class DeviceWatcher:
+
+    def start(self):
+        self.find_current()
+
+        system_bus.add_signal_receiver(self.properties_changed, "PropertiesChanged", PROPERTIES_INTERFACE, BLUEZ_BUS, path_keyword="object_path")
+        # system_bus.add_signal_receiver(interfaces_added, "InterfacesAdded", OBJECT_MANAGER_INTERFACE, BLUEZ_BUS)
+        # system_bus.add_signal_receiver(interfaces_removed, "InterfacesRemoved", OBJECT_MANAGER_INTERFACE, BLUEZ_BUS)
+
+    def find_current(self):
+        object_manager = dbus.Interface(system_bus.get_object(BLUEZ_BUS, "/"), OBJECT_MANAGER_INTERFACE)
+
+        objects = object_manager.GetManagedObjects()
+        for object_path, interfaces in objects.items():
+            if DEVICE_INTERFACE in interfaces:
+                device_properties = interfaces[DEVICE_INTERFACE]
+                if device_properties["Connected"] and SPP_UUID in device_properties["UUIDs"]:
+                    self.device_found(object_path)
+
+    def properties_changed(self, interface, properties, removed_properties, object_path):
+        if interface == DEVICE_INTERFACE:
+            if "Connected" in properties:
+                device = dbus.Interface(system_bus.get_object(BLUEZ_BUS, object_path), PROPERTIES_INTERFACE)
+                uuids = device.Get(DEVICE_INTERFACE, "UUIDs")
+                if SPP_UUID in uuids:
+                    if properties["Connected"]:
+                        self.device_connected(object_path)
+                    else:
+                        self.device_disconnected(object_path)
+
+    # def interfaces_added(object_path, interfaces):
+    # 	if DEVICE_INTERFACE in interfaces:
+    # 		device_properties = interfaces[DEVICE_INTERFACE]
+    # 		if device_properties["Connected"] and SPP_UUID in device_properties["UUIDs"]:
+    # 			device_found(object_path)
+    #
+    # def interfaces_removed(object_path, interfaces_removed):
+    # 	pass
+    #
+
+    def device_found(self, object_path):
+        # print(f"{object_path} found")
+        # device = dbus.Interface(system_bus.get_object(BLUEZ_BUS, object_path), DEVICE_INTERFACE)
+        # device.ConnectProfile(SPP_UUID)
+        self.device_connected(object_path)
+
+    def device_connected(self, object_path):
+        device = dbus.Interface(system_bus.get_object(BLUEZ_BUS, object_path), PROPERTIES_INTERFACE)
+        mac_address = device.Get(DEVICE_INTERFACE, "Address")
+        print(f"{mac_address} connected")
+
+        if mac_address in bose_devices:
+            controller = BoseController(mac_address)
+            controller.connect()
+
+    def device_disconnected(self, object_path):
+        device = dbus.Interface(system_bus.get_object(BLUEZ_BUS, object_path), PROPERTIES_INTERFACE)
+        mac_address = device.Get(DEVICE_INTERFACE, "Address")
+        print(f"{mac_address} disconnected")
+
+
+device_watcher = DeviceWatcher()
+device_watcher.start()
 
 # signal.signal(signal.SIGINT, signal.SIG_DFL)
 Gtk.main()
