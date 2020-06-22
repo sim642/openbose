@@ -18,7 +18,7 @@ import threading
 
 from bose import *
 
-APPINDICATOR_ID = "openbose-tray"
+APPINDICATOR_ID = "openbose-tray" # TODO: make unique
 NOTIFY_ID = "openbose-tray"
 
 Notify.init(NOTIFY_ID)
@@ -29,31 +29,11 @@ def quit():
     Gtk.main_quit()
 
 
-indicator = AppIndicator3.Indicator.new(APPINDICATOR_ID, "audio-headphones", AppIndicator3.IndicatorCategory.HARDWARE)
-# indicator.set_title("openbose")
-indicator.set_status(AppIndicator3.IndicatorStatus.ACTIVE)
-
-
 class TextMenuItem(Gtk.MenuItem):
     def __init__(self, label: str):
         super().__init__()
         self.set_sensitive(False)
         self.set_label(label)
-
-
-menu = Gtk.Menu()
-item_name = TextMenuItem(label="?")
-menu.append(item_name)
-item_battery = TextMenuItem(label="Battery level: ?")
-menu.append(item_battery)
-item_volume = TextMenuItem(label="Volume: ?")
-menu.append(item_volume)
-menu.append(Gtk.SeparatorMenuItem())
-item_quit = Gtk.MenuItem(label="Quit")
-item_quit.connect("activate", lambda _: quit())
-menu.append(item_quit)
-menu.show_all()
-indicator.set_menu(menu)
 
 
 class BoseThread(threading.Thread):
@@ -114,69 +94,104 @@ class GaugeNotification(MyNotification):
         self.set_hint("value", GLib.Variant.new_int32(value))
 
 
-notification_volume = GaugeNotification("openbose", None, "audio-headphones")
-notification_volume.set_category("device")
-notification_volume.set_transient(True)
-notification_battery_level = MyNotification("openbose", None, "audio-headphones")
-notification_battery_level.set_category("device")
-notification_disconnect = MyNotification("openbose", "Disconnected", "audio-headphones")
-notification_disconnect.set_category("device.removed")
+class BoseController:
+    mac_address: str
+
+    indicator: AppIndicator3.Indicator
+
+    menu: Gtk.Menu
+    item_name: Gtk.MenuItem
+    item_battery: Gtk.MenuItem
+    item_volume: Gtk.MenuItem
+
+    notification_volume: GaugeNotification
+    notification_battery_level: MyNotification
+    notification_disconnect: MyNotification
+
+    bose_thread: BoseThread
+
+    def __init__(self, mac_address: str):
+        self.mac_address = mac_address
+
+        self.indicator = AppIndicator3.Indicator.new(APPINDICATOR_ID, "audio-headphones",
+                                                     AppIndicator3.IndicatorCategory.HARDWARE)
+        # self.indicator.set_title("openbose")
+        self.indicator.set_status(AppIndicator3.IndicatorStatus.ACTIVE)
+
+        self.menu = Gtk.Menu()
+        self.item_name = TextMenuItem(label="?")
+        self.menu.append(self.item_name)
+        self.item_battery = TextMenuItem(label="Battery level: ?")
+        self.menu.append(self.item_battery)
+        self.item_volume = TextMenuItem(label="Volume: ?")
+        self.menu.append(self.item_volume)
+        self.menu.append(Gtk.SeparatorMenuItem())
+        item_quit = Gtk.MenuItem(label="Quit")
+        item_quit.connect("activate", lambda _: quit())
+        self.menu.append(item_quit)
+        self.menu.show_all()
+        self.indicator.set_menu(self.menu)
+
+        self.notification_volume = GaugeNotification("openbose", None, "audio-headphones")
+        self.notification_volume.set_category("device")
+        self.notification_volume.set_transient(True)
+        self.notification_battery_level = MyNotification("openbose", None, "audio-headphones")
+        self.notification_battery_level.set_category("device")
+        self.notification_disconnect = MyNotification("openbose", "Disconnected", "audio-headphones")
+        self.notification_disconnect.set_category("device.removed")
+
+        self.MAP = {
+            settings.ProductNameStatusPacket: self.read_product_name_status,
+            status.BatteryLevelStatusPacket: self.read_battery_level_status,
+            audiomanagement.VolumeStatusPacket: self.read_volume_status,
+            devicemanagement.DisconnectProcessingPacket: self.read_disconnect_processing,
+        }
+
+    def read_product_name_status(self, packet: settings.ProductNameStatusPacket):
+        name = packet.product_name
+        s = name
+        print(s)
+        self.item_name.set_label(s)
+        self.notification_volume.set_summary(s)
+        self.notification_battery_level.set_summary(s)
+        self.notification_disconnect.set_summary(s)
+
+    def read_battery_level_status(self, packet: status.BatteryLevelStatusPacket):
+        battery_level = packet.battery_level
+        s = f"Battery level: {str(battery_level)}%"
+        print(s)
+        self.item_battery.set_label(s)
+        self.notification_battery_level.set_body(s)
+        self.notification_battery_level.show()
+
+    def read_volume_status(self, packet: audiomanagement.VolumeStatusPacket):
+        max_volume = packet.max_volume
+        cur_volume = packet.cur_volume
+        volume_percent = round(cur_volume / max_volume * 100)
+        s = f"Volume: {volume_percent}% ({str(cur_volume)}/{str(max_volume)})"
+        print(s)
+        self.item_volume.set_label(s)
+        self.notification_volume.set_body(s)  # just in case if notifyd doesn't support value
+        self.notification_volume.set_value(volume_percent)
+        self.notification_volume.show()
+
+    def read_disconnect_processing(self, packet: devicemanagement.DisconnectProcessingPacket):
+        self.notification_disconnect.show()
+
+    def read_unhandled(self, packet: Packet):
+        pass
+
+    def read_callback(self, packet: Packet):
+        self.MAP.get(type(packet), self.read_unhandled)(packet)
+
+    def connect(self):
+        self.bose_thread = BoseThread(self.mac_address, 8, self.read_callback)
+        self.bose_thread.setDaemon(True)
+        self.bose_thread.start()
 
 
-def read_product_name_status(packet: settings.ProductNameStatusPacket):
-    name = packet.product_name
-    s = name
-    print(s)
-    item_name.set_label(s)
-    notification_volume.set_summary(s)
-    notification_battery_level.set_summary(s)
-    notification_disconnect.set_summary(s)
-
-
-def read_battery_level_status(packet: status.BatteryLevelStatusPacket):
-    battery_level = packet.battery_level
-    s = f"Battery level: {str(battery_level)}%"
-    print(s)
-    item_battery.set_label(s)
-    notification_battery_level.set_body(s)
-    notification_battery_level.show()
-
-
-def read_volume_status(packet: audiomanagement.VolumeStatusPacket):
-    max_volume = packet.max_volume
-    cur_volume = packet.cur_volume
-    volume_percent = round(cur_volume / max_volume * 100)
-    s = f"Volume: {volume_percent}% ({str(cur_volume)}/{str(max_volume)})"
-    print(s)
-    item_volume.set_label(s)
-    notification_volume.set_body(s)  # just in case if notifyd doesn't support value
-    notification_volume.set_value(volume_percent)
-    notification_volume.show()
-
-
-def read_disconnect_processing(packet: devicemanagement.DisconnectProcessingPacket):
-    notification_disconnect.show()
-
-
-MAP = {
-    settings.ProductNameStatusPacket: read_product_name_status,
-    status.BatteryLevelStatusPacket: read_battery_level_status,
-    audiomanagement.VolumeStatusPacket: read_volume_status,
-    devicemanagement.DisconnectProcessingPacket: read_disconnect_processing
-}
-
-
-def read_unhandled(packet):
-    pass
-
-
-def read_callback(packet):
-    MAP.get(type(packet), read_unhandled)(packet)
-
-
-bose_thread = BoseThread("4C:87:5D:53:F2:CF", 8, read_callback)
-bose_thread.setDaemon(True)
+controller = BoseController("4C:87:5D:53:F2:CF")
+controller.connect()
 
 # signal.signal(signal.SIGINT, signal.SIG_DFL)
-bose_thread.start()
 Gtk.main()
