@@ -8,6 +8,7 @@ class FunctionBlock(IntEnum):
     STATUS = 2
     DEVICE_MANAGEMENT = 4
     AUDIO_MANAGEMENT = 5
+    AUGMENTED_REALITY = 21
     # TODO: missing values
 
 
@@ -34,6 +35,7 @@ class StatusFunction(Function):
 
 
 class DeviceManagementFunction(Function):
+    CONNECT = 1
     DISCONNECT = 2
     # TODO: missing values
 
@@ -47,12 +49,18 @@ class AudioManagementFunction(Function):
     # TODO: missing values
 
 
+class AugmentedRealityFunction(Function):
+    AR_STREAMING_STATUS = 2
+    # TODO: missing values
+
+
 FUNCTION_BLOCK_FUNCTION_TYPE: Dict[FunctionBlock, Type[Function]] = {
     FunctionBlock.PRODUCT_INFO: ProductInfoFunction,
     FunctionBlock.SETTINGS: SettingsFunction,
     FunctionBlock.STATUS: StatusFunction,
     FunctionBlock.DEVICE_MANAGEMENT: DeviceManagementFunction,
-    FunctionBlock.AUDIO_MANAGEMENT: AudioManagementFunction
+    FunctionBlock.AUDIO_MANAGEMENT: AudioManagementFunction,
+    FunctionBlock.AUGMENTED_REALITY: AugmentedRealityFunction,
 }
 
 
