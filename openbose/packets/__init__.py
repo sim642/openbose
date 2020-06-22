@@ -1,7 +1,7 @@
 from typing import Dict, Tuple, Type
 
-from bose import FunctionBlock, Function, Operator, Packet
-from bose.packets import productinfo, status, settings, audiomanagement, devicemanagement
+from openbose import FunctionBlock, Function, Operator, Packet
+from openbose.packets import productinfo, status, settings, audiomanagement, devicemanagement
 
 
 FUNCTION_BLOCK_FUNCTION_OPERATOR_PACKET_TYPE: Dict[FunctionBlock, Dict[Tuple[Function, Operator], Type[Packet]]] = {

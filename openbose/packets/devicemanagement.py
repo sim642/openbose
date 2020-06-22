@@ -1,6 +1,6 @@
 from typing import Dict, Tuple, Type
 
-from bose import Packet, Operator, DeviceManagementFunction
+from openbose import Packet, Operator, DeviceManagementFunction
 
 
 class ConnectResultPacket(Packet):

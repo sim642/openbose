@@ -1,6 +1,6 @@
 import gi
 
-from bose.packets import productinfo, settings, status, audiomanagement, devicemanagement
+from openbose.packets import productinfo, settings, status, audiomanagement, devicemanagement
 
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gtk
@@ -23,7 +23,7 @@ import logging
 logging.basicConfig(level=logging.DEBUG, format="%(asctime)s %(name)s %(levelname)s %(mac_address)s %(message)s")
 
 
-from bose import *
+from openbose import *
 
 APPINDICATOR_ID = "openbose-tray" # TODO: make unique
 NOTIFY_ID = "openbose-tray"

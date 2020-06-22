@@ -1,6 +1,6 @@
 from typing import Dict, Tuple, Type
 
-from bose import Packet, FunctionBlock, Operator, ProductInfoFunction
+from openbose import Packet, FunctionBlock, Operator, ProductInfoFunction
 
 
 class BmapVersionGetPacket(Packet):

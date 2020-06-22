@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-from bose import *
+from openbose import *
 
 address = "4C:87:5D:53:F2:CF"
 channel = 8

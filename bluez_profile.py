@@ -4,8 +4,8 @@ import fcntl
 import dbus.service
 import dbus.mainloop.glib
 
-from bose import *
-import bose.connection
+from openbose import *
+import openbose.connection
 
 
 class Profile(dbus.service.Object):
@@ -42,7 +42,7 @@ class Profile(dbus.service.Object):
         os.set_blocking(self.fd, True)
         io = os.fdopen(self.fd, "r+b", buffering=0)
         print(io)
-        conn = bose.connection.ConnectionBase(io)
+        conn = openbose.connection.ConnectionBase(io)
         print(conn)
 
         def write(packet: Packet):

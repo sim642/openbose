@@ -1,6 +1,6 @@
 from unittest import TestCase
 
-from bose import *
+from openbose import *
 
 
 class TestPacket(TestCase):
