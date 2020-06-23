@@ -1,5 +1,6 @@
 import gi
 
+from openbose.connect.gtk import TextMenuItem
 from openbose.connect.notification import MyNotification, GaugeNotification
 
 from openbose.packets import productinfo, settings, status, audiomanagement, devicemanagement
@@ -16,8 +17,6 @@ from gi.repository import Notify
 import dbus
 import dbus.mainloop.glib
 
-import os.path
-import signal
 import threading
 
 import logging
@@ -36,13 +35,6 @@ Notify.init(NOTIFY_ID)
 def quit():
     Notify.uninit()
     Gtk.main_quit()
-
-
-class TextMenuItem(Gtk.MenuItem):
-    def __init__(self, label: str):
-        super().__init__()
-        self.set_sensitive(False)
-        self.set_label(label)
 
 
 class BoseThread(threading.Thread):
