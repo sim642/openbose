@@ -88,11 +88,22 @@ class BoseController:
 
     bose_thread: BoseThread
 
+    INDICATORS: Dict[str, AppIndicator3.Indicator] = {}
+
+    @classmethod
+    def get_indicator(cls, mac_address: str) -> AppIndicator3.Indicator:
+        if mac_address in cls.INDICATORS:
+            return cls.INDICATORS[mac_address]
+        else:
+            indicator = AppIndicator3.Indicator.new(APPINDICATOR_ID + "/" + mac_address, "audio-headphones",
+                                                    AppIndicator3.IndicatorCategory.HARDWARE)
+            cls.INDICATORS[mac_address] = indicator
+            return indicator
+
     def __init__(self, mac_address: str):
         self.mac_address = mac_address
 
-        self.indicator = AppIndicator3.Indicator.new(APPINDICATOR_ID + mac_address, "audio-headphones",
-                                                     AppIndicator3.IndicatorCategory.HARDWARE)
+        self.indicator = self.get_indicator(mac_address)
         # self.indicator.set_title("openbose")
         self.indicator.set_status(AppIndicator3.IndicatorStatus.ACTIVE)
 
@@ -157,7 +168,7 @@ class BoseController:
 
     def read_disconnect_processing(self, packet: devicemanagement.DisconnectProcessingPacket):
         self.notification_disconnect.show()
-        del self.indicator
+        self.indicator.set_status(AppIndicator3.IndicatorStatus.PASSIVE)
 
     def read_unhandled(self, packet: Packet):
         pass
