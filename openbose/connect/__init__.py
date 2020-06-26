@@ -95,7 +95,7 @@ class BoseController:
         if mac_address in cls.INDICATORS:
             return cls.INDICATORS[mac_address]
         else:
-            indicator = AppIndicator3.Indicator.new(APPINDICATOR_ID + "/" + mac_address, "audio-headphones",
+            indicator = AppIndicator3.Indicator.new(APPINDICATOR_ID + "_" + mac_address, "audio-headphones",
                                                     AppIndicator3.IndicatorCategory.HARDWARE)
             cls.INDICATORS[mac_address] = indicator
             return indicator
