@@ -104,7 +104,7 @@ class BoseController:
         self.mac_address = mac_address
 
         self.indicator = self.get_indicator(mac_address)
-        # self.indicator.set_title("openbose")
+        self.indicator.set_title("openbose")
         self.indicator.set_status(AppIndicator3.IndicatorStatus.ACTIVE)
 
         self.menu = Gtk.Menu()
@@ -142,6 +142,7 @@ class BoseController:
         name = packet.product_name
         s = name
         self.logger.info(s)
+        self.indicator.set_title(s)
         self.item_name.set_label(s)
         self.notification_volume.set_summary(s)
         self.notification_battery_level.set_summary(s)
