@@ -1,3 +1,5 @@
+from typing import Optional
+
 import gi
 
 from openbose.connect.gtk import TextMenuItem, TextIconMenuItem
@@ -48,28 +50,31 @@ class BoseThread(threading.Thread):
 
     def run(self) -> None:
         with Connection(self.address, self.channel) as conn:
+            self.conn = conn
 
-            def write(packet: Packet):
-                self.logger.debug("--> %s", packet)
-                conn.write(packet)
-
-            def read() -> Packet:
-                packet = conn.read()
-                self.logger.debug("<-- %s", packet)
-                return packet
-
-            write(productinfo.BmapVersionGetPacket())
-            write(settings.ProductNameGetPacket())
-            write(status.BatteryLevelGetPacket())
-            write(audiomanagement.VolumeGetPacket())
+            self.write(productinfo.BmapVersionGetPacket())
+            self.write(settings.ProductNameGetPacket())
+            self.write(status.BatteryLevelGetPacket())
+            self.write(audiomanagement.SourceGetPacket())
+            self.write(audiomanagement.VolumeGetPacket())
+            self.write(devicemanagement.ListDevicesGetPacket())
 
             try:
                 while True:
-                    packet = read()
+                    packet = self.read()
                     GLib.idle_add(self.read_callback, packet)
             except ConnectionResetError as e:
                 # quit()
                 self.logger.info("disconnected", exc_info=e)
+
+    def write(self, packet: Packet):
+        self.logger.debug("--> %s", packet)
+        self.conn.write(packet)
+
+    def read(self) -> Packet:
+        packet = self.conn.read()
+        self.logger.debug("<-- %s", packet)
+        return packet
 
 
 class BoseController:
@@ -80,6 +85,7 @@ class BoseController:
     menu: Gtk.Menu
     item_name: TextMenuItem
     item_battery: TextIconMenuItem
+    item_source: TextMenuItem
     item_volume: TextIconMenuItem
 
     notification_volume: GaugeNotification
@@ -87,6 +93,9 @@ class BoseController:
     notification_disconnect: MyNotification
 
     bose_thread: BoseThread
+
+    device_names: Dict[str, Optional[str]]
+    source_mac_address: Optional[str]
 
     INDICATORS: Dict[str, AppIndicator3.Indicator] = {}
 
@@ -112,6 +121,8 @@ class BoseController:
         self.menu.append(self.item_name)
         self.item_battery = TextIconMenuItem(label="Battery level: ?", icon_name="battery-missing")
         self.menu.append(self.item_battery)
+        self.item_source = TextMenuItem(label="Source: ?")
+        self.menu.append(self.item_source)
         self.item_volume = TextIconMenuItem(label="Volume: ?", icon_name="audio-volume-off")
         self.menu.append(self.item_volume)
         self.menu.append(Gtk.SeparatorMenuItem())
@@ -134,9 +145,15 @@ class BoseController:
             status.BatteryLevelStatusPacket: self.read_battery_level_status,
             audiomanagement.VolumeStatusPacket: self.read_volume_status,
             devicemanagement.DisconnectProcessingPacket: self.read_disconnect_processing,
+            devicemanagement.ListDevicesStatusPacket: self.read_devices_status,
+            devicemanagement.InfoStatusPacket: self.read_info_status,
+            audiomanagement.SourceStatusPacket: self.read_source_status
         }
 
         self.logger = logging.LoggerAdapter(logging.getLogger("BoseController"), {"mac_address": mac_address})
+
+        self.device_names = {}
+        self.source_mac_address = None
 
     def read_product_name_status(self, packet: settings.ProductNameStatusPacket):
         name = packet.product_name
@@ -196,6 +213,27 @@ class BoseController:
     def read_disconnect_processing(self, packet: devicemanagement.DisconnectProcessingPacket):
         self.notification_disconnect.show()
         self.indicator.set_status(AppIndicator3.IndicatorStatus.PASSIVE)
+
+    def read_devices_status(self, packet: devicemanagement.ListDevicesStatusPacket):
+        for mac_address in packet.mac_addresses:
+            self.device_names[mac_address] = None
+            self.bose_thread.write(devicemanagement.InfoGetPacket(mac_address))
+
+    def read_info_status(self, packet: devicemanagement.InfoStatusPacket):
+        self.device_names[packet.mac_address] = packet.name
+        if packet.mac_address == self.source_mac_address:
+            self.show_source()
+
+    def read_source_status(self, packet: audiomanagement.SourceStatusPacket):
+        self.source_mac_address = packet.mac_address
+        self.show_source()
+
+    def show_source(self):
+        mac_address = self.source_mac_address
+        source = self.device_names.get(mac_address, mac_address)
+        s = f"Source: {source}"
+        self.logger.info(s)
+        self.item_source.set_label(s)
 
     def read_unhandled(self, packet: Packet):
         pass

@@ -37,6 +37,8 @@ class StatusFunction(Function):
 class DeviceManagementFunction(Function):
     CONNECT = 1
     DISCONNECT = 2
+    LIST_DEVICES = 4
+    INFO = 5
     # TODO: missing values
 
 
