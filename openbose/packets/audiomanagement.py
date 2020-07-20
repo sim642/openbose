@@ -9,6 +9,11 @@ class SourceGetPacket(Packet):
         super().__init__(FunctionBlock.AUDIO_MANAGEMENT, AudioManagementFunction.SOURCE, Operator.GET)
 
 
+class StatusGetPacket(Packet):
+    def __init__(self) -> None:
+        super().__init__(FunctionBlock.AUDIO_MANAGEMENT, AudioManagementFunction.STATUS, Operator.GET)
+
+
 class VolumeGetPacket(Packet):
     def __init__(self) -> None:
         super().__init__(FunctionBlock.AUDIO_MANAGEMENT, AudioManagementFunction.VOLUME, Operator.GET)
@@ -40,6 +45,33 @@ class SourceStatusPacket(Packet):
         return self.payload[3:9].hex(sep=":", bytes_per_sep=1)
 
 
+class Status(IntEnum):
+    STOP = 0
+    PLAY = 1
+    PAUSE = 2
+    # TODO: some are not actually valid statuses, only controls?
+    # TRACK_FORWARD = 3
+    # TRACK_BACK = 4
+    FAST_FORWARD_PRESS = 5
+    # FAST_FORWARD_RELEASE = 6
+    REWIND_PRESS = 7
+    # REWIND_RELEASE = 8
+
+
+class StatusStatusPacket(Packet):
+    @property
+    def status(self) -> Status:
+        return Status(self.payload[0])
+
+    @property
+    def track_position(self) -> int:
+        # TODO: figure out usage and unit
+        if len(self.payload) == 1 + 2:
+            return (self.payload[1] << 8) | self.payload[2]
+        else:
+            return 0xFFFF
+
+
 class VolumeStatusPacket(Packet):
     @property
     def max_volume(self):
@@ -52,5 +84,6 @@ class VolumeStatusPacket(Packet):
 
 FUNCTION_OPERATOR_PACKET_TYPE: Dict[Tuple[AudioManagementFunction, Operator], Type[Packet]] = {
     (AudioManagementFunction.SOURCE, Operator.STATUS): SourceStatusPacket,
+    (AudioManagementFunction.STATUS, Operator.STATUS): StatusStatusPacket,
     (AudioManagementFunction.VOLUME, Operator.STATUS): VolumeStatusPacket
 }
