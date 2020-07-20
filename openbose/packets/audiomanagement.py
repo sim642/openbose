@@ -24,6 +24,11 @@ class VolumeSetGetPacket(Packet):
         super().__init__(FunctionBlock.AUDIO_MANAGEMENT, AudioManagementFunction.VOLUME, Operator.SET_GET, bytes([volume]))
 
 
+class NowPlayingStartPacket(Packet):
+    def __init__(self) -> None:
+        super().__init__(FunctionBlock.AUDIO_MANAGEMENT, AudioManagementFunction.NOW_PLAYING, Operator.START)
+
+
 class SourceType(IntEnum):
     NONE = 0
     BLUETOOTH = 1
@@ -82,8 +87,29 @@ class VolumeStatusPacket(Packet):
         return self.payload[1]
 
 
+class NowPlayingAttribute(IntEnum):
+    SONG_TITLE = 0
+    ARTIST = 1
+    ALBUM = 2
+    TRACK_NUMBER = 3
+    TOTAL_NUMBER_OF_TRACKS = 4
+    GENRE = 5
+    PLAYING_TIME = 6
+
+
+class NowPlayingStatusPacket(Packet):
+    @property
+    def attribute(self) -> NowPlayingAttribute:
+        return NowPlayingAttribute(self.payload[0])
+    
+    @property
+    def value(self) -> str:
+        return self.payload[1:].decode("utf-8")
+
+
 FUNCTION_OPERATOR_PACKET_TYPE: Dict[Tuple[AudioManagementFunction, Operator], Type[Packet]] = {
     (AudioManagementFunction.SOURCE, Operator.STATUS): SourceStatusPacket,
     (AudioManagementFunction.STATUS, Operator.STATUS): StatusStatusPacket,
-    (AudioManagementFunction.VOLUME, Operator.STATUS): VolumeStatusPacket
+    (AudioManagementFunction.VOLUME, Operator.STATUS): VolumeStatusPacket,
+    (AudioManagementFunction.NOW_PLAYING, Operator.STATUS): NowPlayingStatusPacket
 }

@@ -59,6 +59,7 @@ class BoseThread(threading.Thread):
             self.write(audiomanagement.StatusGetPacket())
             self.write(audiomanagement.VolumeGetPacket())
             self.write(devicemanagement.ListDevicesGetPacket())
+            self.write(audiomanagement.NowPlayingStartPacket())
 
             try:
                 while True:
@@ -88,6 +89,9 @@ class BoseController:
     item_battery: TextIconMenuItem
     item_status_source: TextMenuItem
     item_volume: TextIconMenuItem
+    item_title: TextMenuItem
+    item_artist: TextMenuItem
+    item_album: TextMenuItem
 
     notification_volume: GaugeNotification
     notification_battery_level: MyNotification
@@ -127,6 +131,13 @@ class BoseController:
         self.item_volume = TextIconMenuItem(label="Volume: ?", icon_name="audio-volume-off")
         self.menu.append(self.item_volume)
         self.menu.append(Gtk.SeparatorMenuItem())
+        self.item_title = TextMenuItem(label="Title: ?")
+        self.menu.append(self.item_title)
+        self.item_artist = TextMenuItem(label="Artist: ?")
+        self.menu.append(self.item_artist)
+        self.item_album = TextMenuItem(label="Album: ?")
+        self.menu.append(self.item_album)
+        self.menu.append(Gtk.SeparatorMenuItem())
         item_quit = Gtk.MenuItem(label="Quit")
         item_quit.connect("activate", lambda _: quit())
         self.menu.append(item_quit)
@@ -149,7 +160,8 @@ class BoseController:
             devicemanagement.ListDevicesStatusPacket: self.read_devices_status,
             devicemanagement.InfoStatusPacket: self.read_info_status,
             audiomanagement.SourceStatusPacket: self.read_source_status,
-            audiomanagement.StatusStatusPacket: self.read_status_status
+            audiomanagement.StatusStatusPacket: self.read_status_status,
+            audiomanagement.NowPlayingStatusPacket: self.read_now_playing_status
         }
 
         self.logger = logging.LoggerAdapter(logging.getLogger("BoseController"), {"mac_address": mac_address})
@@ -231,6 +243,7 @@ class BoseController:
         self.show_source()
         # update audio status because different source may have different one (or not report any)
         self.bose_thread.write(audiomanagement.StatusGetPacket())
+        self.bose_thread.write(audiomanagement.NowPlayingStartPacket())
 
     def show_source(self):
         mac_address = self.source_mac_address
@@ -252,6 +265,17 @@ class BoseController:
         else:
             icon_name = "gnome-unknown"  # TODO: don't use DE-specific icon?
         self.item_status_source.set_icon(icon_name)
+
+    def read_now_playing_status(self, packet: audiomanagement.NowPlayingStatusPacket):
+        s = f"Now playing: {packet.attribute!r}: {packet.value}"
+        self.logger.info(s)
+
+        if packet.attribute == audiomanagement.NowPlayingAttribute.SONG_TITLE:
+            self.item_title.set_label(f"Title: {packet.value}")
+        elif packet.attribute == audiomanagement.NowPlayingAttribute.ARTIST:
+            self.item_artist.set_label(f"Artist: {packet.value}")
+        elif packet.attribute == audiomanagement.NowPlayingAttribute.ALBUM:
+            self.item_album.set_label(f"Album: {packet.value}")
 
     def read_unhandled(self, packet: Packet):
         pass
