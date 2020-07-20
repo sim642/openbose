@@ -1,3 +1,4 @@
+from enum import IntEnum
 from typing import Dict, Tuple, Type
 
 from openbose import Packet, FunctionBlock, Operator, AudioManagementFunction
@@ -18,6 +19,12 @@ class VolumeSetGetPacket(Packet):
         super().__init__(FunctionBlock.AUDIO_MANAGEMENT, AudioManagementFunction.VOLUME, Operator.SET_GET, bytes([volume]))
 
 
+class SourceType(IntEnum):
+    NONE = 0
+    BLUETOOTH = 1
+    AUXILIARY = 2
+
+
 class SourceStatusPacket(Packet):
     @property
     def available_sources(self):
@@ -25,9 +32,8 @@ class SourceStatusPacket(Packet):
         return (self.payload[0] << 8) | self.payload[1]
 
     @property
-    def source_type(self) -> int:
-        # TODO: enum: NONE, BLUETOOTH, AUXILIARY
-        return self.payload[2]
+    def source_type(self) -> SourceType:
+        return SourceType(self.payload[2])
 
     @property
     def mac_address(self):
