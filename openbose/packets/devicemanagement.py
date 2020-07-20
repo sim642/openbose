@@ -1,6 +1,6 @@
 from typing import Dict, Tuple, Type, Optional
 
-from openbose import Packet, Operator, DeviceManagementFunction, FunctionBlock
+from openbose import Packet, Operator, DeviceManagementFunction, FunctionBlock, ProductType
 
 
 class ConnectResultPacket(Packet):
@@ -56,10 +56,9 @@ class InfoStatusPacket(Packet):
         return bool((self.payload[6] >> 2) & 1)
 
     @property
-    def product_type(self) -> Optional[int]:
-        # TODO: ProductType
+    def product_type(self) -> Optional[ProductType]:
         if self.bose_product:
-            return (self.payload[6] >> 7) & 1
+            return ProductType((self.payload[6] >> 7) & 1)
         else:
             return None
 

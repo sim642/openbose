@@ -1,10 +1,6 @@
 import hashlib
-import enum
 
-
-class ProductType(enum.IntEnum):
-    HEADPHONES = 0
-    SPEAKER = 1
+from openbose import ProductType
 
 
 class ManufacturerData:

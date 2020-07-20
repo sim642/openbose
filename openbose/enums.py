@@ -75,3 +75,8 @@ class Operator(IntEnum):
     START = 5
     RESULT = 6
     PROCESSING = 7
+
+
+class ProductType(IntEnum):
+    HEADPHONES = 0
+    SPEAKER = 1
