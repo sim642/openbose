@@ -99,6 +99,7 @@ class BoseController:
     notification_battery_level: MyNotification
     notification_connect: MyNotification
     notification_disconnect: MyNotification
+    notification_source: MyNotification
 
     bose_thread: BoseThread
 
@@ -156,6 +157,8 @@ class BoseController:
         self.notification_connect.set_category("device.added")
         self.notification_disconnect = MyNotification("openbose", "Disconnected", "audio-headphones")
         self.notification_disconnect.set_category("device.removed")
+        self.notification_source = MyNotification("openbose", None, "audio-headphones")
+        self.notification_source.set_category("device")
 
         self.MAP = {
             settings.ProductNameStatusPacket: self.read_product_name_status,
@@ -184,6 +187,7 @@ class BoseController:
         self.notification_battery_level.set_summary(s)
         self.notification_connect.set_summary(s)
         self.notification_disconnect.set_summary(s)
+        self.notification_source.set_summary(s)
 
         self.notification_connect.show()
 
@@ -259,6 +263,8 @@ class BoseController:
         s = f"Source: {source}"
         self.logger.info(s)
         self.item_status_source.set_label(s)
+        self.notification_source.set_body(s)
+        self.notification_source.show()
 
     def read_status_status(self, packet: audiomanagement.StatusStatusPacket):
         self.logger.info(f"Status: {packet.status!r}")
