@@ -100,6 +100,7 @@ class BoseController:
     notification_connect: MyNotification
     notification_disconnect: MyNotification
     notification_source: MyNotification
+    notification_status: MyNotification
 
     bose_thread: BoseThread
 
@@ -159,6 +160,8 @@ class BoseController:
         self.notification_disconnect.set_category("device.removed")
         self.notification_source = MyNotification("openbose", None, "audio-headphones")
         self.notification_source.set_category("device")
+        self.notification_status = MyNotification("openbose", None, "audio-headphones")
+        self.notification_status.set_category("device")
 
         self.MAP = {
             settings.ProductNameStatusPacket: self.read_product_name_status,
@@ -188,6 +191,7 @@ class BoseController:
         self.notification_connect.set_summary(s)
         self.notification_disconnect.set_summary(s)
         self.notification_source.set_summary(s)
+        self.notification_status.set_summary(s)
 
         self.notification_connect.show()
 
@@ -267,18 +271,27 @@ class BoseController:
         self.notification_source.show()
 
     def read_status_status(self, packet: audiomanagement.StatusStatusPacket):
-        self.logger.info(f"Status: {packet.status!r}")
-
         icon_name = None
+        status_name = None
         if packet.status == audiomanagement.Status.STOP:
             icon_name = "media-playback-stop"
+            status_name = "stopped"
         elif packet.status == audiomanagement.Status.PLAY:
             icon_name = "media-playback-start"
+            status_name = "playing"
         elif packet.status == audiomanagement.Status.PAUSE:
             icon_name = "media-playback-pause"
+            status_name = "paused"
         else:
             icon_name = "gnome-unknown"  # TODO: don't use DE-specific icon?
+            status_name = repr(packet.status)
+
+        s = f"Status: {status_name}"
+        self.logger.info(s)
+
         self.item_status_source.set_icon(icon_name)
+        self.notification_status.set_body(s)
+        self.notification_status.show()
 
     def read_now_playing_status(self, packet: audiomanagement.NowPlayingStatusPacket):
         s = f"Now playing: {packet.attribute!r}: {packet.value}"
