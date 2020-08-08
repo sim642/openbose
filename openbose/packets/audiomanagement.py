@@ -54,13 +54,12 @@ class Status(IntEnum):
     STOP = 0
     PLAY = 1
     PAUSE = 2
-    # TODO: some are not actually valid statuses, only controls?
-    # TRACK_FORWARD = 3
-    # TRACK_BACK = 4
-    FAST_FORWARD_PRESS = 5
-    # FAST_FORWARD_RELEASE = 6
-    REWIND_PRESS = 7
-    # REWIND_RELEASE = 8
+    TRACK_FORWARD = 3
+    TRACK_BACK = 4
+    FAST_FORWARD_PRESS = 5  # never seen
+    FAST_FORWARD_RELEASE = 6  # never seen, not valid status?
+    REWIND_PRESS = 7  # never seen
+    REWIND_RELEASE = 8  # never seen, not valid status?
 
 
 class StatusStatusPacket(Packet):
