@@ -187,7 +187,7 @@ class BoseController:
         self.device_names = {}
         self.source_mac_address = None
 
-        self.now_playing = {}
+        self.reset_now_playing()
 
     def read_product_name_status(self, packet: settings.ProductNameStatusPacket):
         name = packet.product_name
@@ -309,15 +309,24 @@ class BoseController:
 
         if packet.attribute == audiomanagement.NowPlayingAttribute.SONG_TITLE:
             self.item_title.set_label(f"Title: {packet.value}")
+            self.item_title.show()
         elif packet.attribute == audiomanagement.NowPlayingAttribute.ARTIST:
             self.item_artist.set_label(f"Artist: {packet.value}")
+            self.item_artist.show()
         elif packet.attribute == audiomanagement.NowPlayingAttribute.ALBUM:
             self.item_album.set_label(f"Album: {packet.value}")
+            self.item_album.show()
 
         self.now_playing[packet.attribute] = packet.value
 
-    def read_now_playing_processing(self, packet: audiomanagement.NowPlayingProcessingPacket):
+    def reset_now_playing(self):
         self.now_playing = {}
+        self.item_title.hide()
+        self.item_artist.hide()
+        self.item_album.hide()
+
+    def read_now_playing_processing(self, packet: audiomanagement.NowPlayingProcessingPacket):
+        self.reset_now_playing()
 
     def read_now_playing_result(self, packet: audiomanagement.NowPlayingProcessingPacket):
         ss = []
