@@ -97,6 +97,7 @@ class BoseController:
 
     notification_volume: GaugeNotification
     notification_battery_level: MyNotification
+    notification_connect: MyNotification
     notification_disconnect: MyNotification
 
     bose_thread: BoseThread
@@ -151,6 +152,8 @@ class BoseController:
         self.notification_volume.set_transient(True)
         self.notification_battery_level = MyNotification("openbose", None, "audio-headphones")
         self.notification_battery_level.set_category("device")
+        self.notification_connect = MyNotification("openbose", "Connected", "audio-headphones")
+        self.notification_connect.set_category("device.added")
         self.notification_disconnect = MyNotification("openbose", "Disconnected", "audio-headphones")
         self.notification_disconnect.set_category("device.removed")
 
@@ -179,7 +182,10 @@ class BoseController:
         self.item_name.set_label(s)
         self.notification_volume.set_summary(s)
         self.notification_battery_level.set_summary(s)
+        self.notification_connect.set_summary(s)
         self.notification_disconnect.set_summary(s)
+
+        self.notification_connect.show()
 
     def read_battery_level_status(self, packet: status.BatteryLevelStatusPacket):
         battery_level = packet.battery_level
