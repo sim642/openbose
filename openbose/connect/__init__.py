@@ -25,6 +25,8 @@ import logging
 
 logging.basicConfig(level=logging.DEBUG, format="%(asctime)s %(name)s %(levelname)s %(mac_address)s %(message)s")
 
+import yaml
+
 
 from openbose import *
 
@@ -296,7 +298,10 @@ DEVICE_INTERFACE = "org.bluez.Device1"
 
 SPP_UUID = "00001101-0000-1000-8000-00805f9b34fb"
 
-bose_devices = {"4C:87:5D:53:F2:CF"}
+with open("config.yml", "r", encoding="utf-8") as config_file:
+    config = yaml.load(config_file)
+
+bose_devices = config["devices"]
 
 dbus.mainloop.glib.DBusGMainLoop(set_as_default=True)
 system_bus = dbus.SystemBus()
