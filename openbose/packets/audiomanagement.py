@@ -107,9 +107,19 @@ class NowPlayingStatusPacket(Packet):
         return self.payload[1:].decode("utf-8")
 
 
+class NowPlayingProcessingPacket(Packet):
+    pass
+
+
+class NowPlayingResultPacket(Packet):
+    pass
+
+
 FUNCTION_OPERATOR_PACKET_TYPE: Dict[Tuple[AudioManagementFunction, Operator], Type[Packet]] = {
     (AudioManagementFunction.SOURCE, Operator.STATUS): SourceStatusPacket,
     (AudioManagementFunction.STATUS, Operator.STATUS): StatusStatusPacket,
     (AudioManagementFunction.VOLUME, Operator.STATUS): VolumeStatusPacket,
-    (AudioManagementFunction.NOW_PLAYING, Operator.STATUS): NowPlayingStatusPacket
+    (AudioManagementFunction.NOW_PLAYING, Operator.STATUS): NowPlayingStatusPacket,
+    (AudioManagementFunction.NOW_PLAYING, Operator.PROCESSING): NowPlayingProcessingPacket,
+    (AudioManagementFunction.NOW_PLAYING, Operator.RESULT): NowPlayingResultPacket,
 }

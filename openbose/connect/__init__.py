@@ -101,11 +101,14 @@ class BoseController:
     notification_disconnect: MyNotification
     notification_source: MyNotification
     notification_status: MyNotification
+    notification_now_playing: MyNotification
 
     bose_thread: BoseThread
 
     device_names: Dict[str, Optional[str]]
     source_mac_address: Optional[str]
+
+    now_playing: Dict[audiomanagement.NowPlayingAttribute, str]
 
     INDICATORS: Dict[str, AppIndicator3.Indicator] = {}
 
@@ -162,6 +165,8 @@ class BoseController:
         self.notification_source.set_category("device")
         self.notification_status = MyNotification("openbose", None, "audio-headphones")
         self.notification_status.set_category("device")
+        self.notification_now_playing = MyNotification("openbose", None, "audio-headphones")
+        self.notification_now_playing.set_category("device")
 
         self.MAP = {
             settings.ProductNameStatusPacket: self.read_product_name_status,
@@ -172,13 +177,17 @@ class BoseController:
             devicemanagement.InfoStatusPacket: self.read_info_status,
             audiomanagement.SourceStatusPacket: self.read_source_status,
             audiomanagement.StatusStatusPacket: self.read_status_status,
-            audiomanagement.NowPlayingStatusPacket: self.read_now_playing_status
+            audiomanagement.NowPlayingStatusPacket: self.read_now_playing_status,
+            audiomanagement.NowPlayingProcessingPacket: self.read_now_playing_processing,
+            audiomanagement.NowPlayingResultPacket: self.read_now_playing_result,
         }
 
         self.logger = logging.LoggerAdapter(logging.getLogger("BoseController"), {"mac_address": mac_address})
 
         self.device_names = {}
         self.source_mac_address = None
+
+        self.now_playing = {}
 
     def read_product_name_status(self, packet: settings.ProductNameStatusPacket):
         name = packet.product_name
@@ -192,6 +201,7 @@ class BoseController:
         self.notification_disconnect.set_summary(s)
         self.notification_source.set_summary(s)
         self.notification_status.set_summary(s)
+        self.notification_now_playing.set_summary(s)
 
         self.notification_connect.show()
 
@@ -303,6 +313,26 @@ class BoseController:
             self.item_artist.set_label(f"Artist: {packet.value}")
         elif packet.attribute == audiomanagement.NowPlayingAttribute.ALBUM:
             self.item_album.set_label(f"Album: {packet.value}")
+
+        self.now_playing[packet.attribute] = packet.value
+
+    def read_now_playing_processing(self, packet: audiomanagement.NowPlayingProcessingPacket):
+        self.now_playing = {}
+
+    def read_now_playing_result(self, packet: audiomanagement.NowPlayingProcessingPacket):
+        ss = []
+        if audiomanagement.NowPlayingAttribute.SONG_TITLE in self.now_playing:
+            ss.append(f"Title: {self.now_playing[audiomanagement.NowPlayingAttribute.SONG_TITLE]}")
+        if audiomanagement.NowPlayingAttribute.ARTIST in self.now_playing:
+            ss.append(f"Artist: {self.now_playing[audiomanagement.NowPlayingAttribute.ARTIST]}")
+        if audiomanagement.NowPlayingAttribute.ALBUM in self.now_playing:
+            ss.append(f"Album: {self.now_playing[audiomanagement.NowPlayingAttribute.ALBUM]}")
+
+        if ss:
+            s = "\n".join(ss)
+            self.logger.info(s)
+            self.notification_now_playing.set_body(s)
+            self.notification_now_playing.show()
 
     def read_unhandled(self, packet: Packet):
         pass
