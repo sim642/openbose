@@ -1,3 +1,4 @@
+import collections
 from typing import Optional
 
 import gi
@@ -41,12 +42,17 @@ def quit():
     Gtk.main_quit()
 
 
+class PacketHandler:
+    def on_packet(self, packet: Packet):
+        pass
+
+
 class BoseThread(threading.Thread):
-    def __init__(self, address, channel, read_callback):
+    def __init__(self, address, channel, packet_handler: PacketHandler):
         super().__init__()
         self.address = address
         self.channel = channel
-        self.read_callback = read_callback
+        self.packet_handler = packet_handler
         
         self.logger = logging.LoggerAdapter(logging.getLogger("BoseThread"), {"mac_address": address})
 
@@ -66,7 +72,7 @@ class BoseThread(threading.Thread):
             try:
                 while True:
                     packet = self.read()
-                    GLib.idle_add(self.read_callback, packet)
+                    GLib.idle_add(self.packet_handler.on_packet, packet)
             except ConnectionResetError as e:
                 # quit()
                 self.logger.info("disconnected", exc_info=e)
@@ -79,6 +85,20 @@ class BoseThread(threading.Thread):
         packet = self.conn.read()
         self.logger.debug("<-- %s", packet)
         return packet
+
+
+class PacketDispatcher(PacketHandler):
+    def __init__(self) -> None:
+        super().__init__()
+        self.callbacks = collections.defaultdict(list)
+
+    def add(self, packet_type, callback):
+        self.callbacks[packet_type].append(callback)
+
+    def on_packet(self, packet: Packet):
+        type_callbacks = self.callbacks[type(packet)]
+        for callback in type_callbacks:
+            callback(packet)
 
 
 class BoseController:
@@ -104,6 +124,8 @@ class BoseController:
     notification_now_playing: MyNotification
 
     bose_thread: BoseThread
+
+    packet_dispatcher: PacketDispatcher
 
     device_names: Dict[str, Optional[str]]
     source_mac_address: Optional[str]
@@ -168,19 +190,19 @@ class BoseController:
         self.notification_now_playing = MyNotification("openbose", None, "audio-headphones")
         self.notification_now_playing.set_category("device")
 
-        self.MAP = {
-            settings.ProductNameStatusPacket: self.read_product_name_status,
-            status.BatteryLevelStatusPacket: self.read_battery_level_status,
-            audiomanagement.VolumeStatusPacket: self.read_volume_status,
-            devicemanagement.DisconnectProcessingPacket: self.read_disconnect_processing,
-            devicemanagement.ListDevicesStatusPacket: self.read_devices_status,
-            devicemanagement.InfoStatusPacket: self.read_info_status,
-            audiomanagement.SourceStatusPacket: self.read_source_status,
-            audiomanagement.StatusStatusPacket: self.read_status_status,
-            audiomanagement.NowPlayingStatusPacket: self.read_now_playing_status,
-            audiomanagement.NowPlayingProcessingPacket: self.read_now_playing_processing,
-            audiomanagement.NowPlayingResultPacket: self.read_now_playing_result,
-        }
+        self.packet_dispatcher = PacketDispatcher()
+
+        self.packet_dispatcher.add(settings.ProductNameStatusPacket, self.read_product_name_status)
+        self.packet_dispatcher.add(status.BatteryLevelStatusPacket, self.read_battery_level_status)
+        self.packet_dispatcher.add(audiomanagement.VolumeStatusPacket, self.read_volume_status)
+        self.packet_dispatcher.add(devicemanagement.DisconnectProcessingPacket, self.read_disconnect_processing)
+        self.packet_dispatcher.add(devicemanagement.ListDevicesStatusPacket, self.read_devices_status)
+        self.packet_dispatcher.add(devicemanagement.InfoStatusPacket, self.read_info_status)
+        self.packet_dispatcher.add(audiomanagement.SourceStatusPacket, self.read_source_status)
+        self.packet_dispatcher.add(audiomanagement.StatusStatusPacket, self.read_status_status)
+        self.packet_dispatcher.add(audiomanagement.NowPlayingStatusPacket, self.read_now_playing_status)
+        self.packet_dispatcher.add(audiomanagement.NowPlayingProcessingPacket, self.read_now_playing_processing)
+        self.packet_dispatcher.add(audiomanagement.NowPlayingResultPacket, self.read_now_playing_result)
 
         self.logger = logging.LoggerAdapter(logging.getLogger("BoseController"), {"mac_address": mac_address})
 
@@ -343,14 +365,8 @@ class BoseController:
             self.notification_now_playing.set_body(s)
             self.notification_now_playing.show()
 
-    def read_unhandled(self, packet: Packet):
-        pass
-
-    def read_callback(self, packet: Packet):
-        self.MAP.get(type(packet), self.read_unhandled)(packet)
-
     def connect(self):
-        self.bose_thread = BoseThread(self.mac_address, 8, self.read_callback)
+        self.bose_thread = BoseThread(self.mac_address, 8, self.packet_dispatcher)
         self.bose_thread.setDaemon(True)
         self.bose_thread.start()
 
