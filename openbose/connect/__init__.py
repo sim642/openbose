@@ -48,11 +48,15 @@ class PacketHandler:
 
 
 class BoseThread(threading.Thread):
+    init_writes: List[Packet]
+
     def __init__(self, address, channel, packet_handler: PacketHandler):
         super().__init__()
         self.address = address
         self.channel = channel
         self.packet_handler = packet_handler
+        self.init_writes = []
+        self.conn = None
         
         self.logger = logging.LoggerAdapter(logging.getLogger("BoseThread"), {"mac_address": address})
 
@@ -60,14 +64,10 @@ class BoseThread(threading.Thread):
         with Connection(self.address, self.channel) as conn:
             self.conn = conn
 
-            self.write(productinfo.BmapVersionGetPacket())
-            self.write(settings.ProductNameGetPacket())
-            self.write(status.BatteryLevelGetPacket())
-            self.write(audiomanagement.SourceGetPacket())
-            self.write(audiomanagement.StatusGetPacket())
-            self.write(audiomanagement.VolumeGetPacket())
-            self.write(devicemanagement.ListDevicesGetPacket())
-            self.write(audiomanagement.NowPlayingStartPacket())
+            # TODO: remove hack of controllers writing before connected
+            for init_write in self.init_writes:
+                self.write(init_write)
+            self.init_writes = []
 
             try:
                 while True:
@@ -78,8 +78,12 @@ class BoseThread(threading.Thread):
                 self.logger.info("disconnected", exc_info=e)
 
     def write(self, packet: Packet):
-        self.logger.debug("--> %s", packet)
-        self.conn.write(packet)
+        if self.conn:
+            self.logger.debug("--> %s", packet)
+            self.conn.write(packet)
+        else:
+            self.logger.debug("~~> %s", packet)
+            self.init_writes.append(packet)
 
     def read(self) -> Packet:
         packet = self.conn.read()
@@ -131,6 +135,9 @@ class ConnectionController(Controller):
 
         self.logger = logging.LoggerAdapter(logging.getLogger("ConnectionController"), {"mac_address": self.bose_controller.mac_address})  # TODO: centralize controller logger management
 
+        self.bose_controller.bose_thread.write(productinfo.BmapVersionGetPacket())
+        self.bose_controller.bose_thread.write(settings.ProductNameGetPacket())
+
     @property
     def menu_items(self) -> List[Gtk.MenuItem]:
         return [self.item_name]
@@ -169,6 +176,8 @@ class BatteryLevelController(Controller):
         self.bose_controller.packet_dispatcher.add(status.BatteryLevelStatusPacket, self.read_battery_level_status)
 
         self.logger = logging.LoggerAdapter(logging.getLogger("BatteryLevelController"), {"mac_address": self.bose_controller.mac_address})  # TODO: centralize controller logger management
+
+        self.bose_controller.bose_thread.write(status.BatteryLevelGetPacket())
 
     @property
     def menu_items(self) -> List[Gtk.MenuItem]:
@@ -213,6 +222,8 @@ class VolumeController(Controller):
         self.bose_controller.packet_dispatcher.add(audiomanagement.VolumeStatusPacket, self.read_volume_status)
 
         self.logger = logging.LoggerAdapter(logging.getLogger("VolumeController"), {"mac_address": self.bose_controller.mac_address})  # TODO: centralize controller logger management
+
+        self.bose_controller.bose_thread.write(audiomanagement.VolumeGetPacket())
 
     @property
     def menu_items(self) -> List[Gtk.MenuItem]:
@@ -265,6 +276,7 @@ class NowPlayingController(Controller):
         self.logger = logging.LoggerAdapter(logging.getLogger("NowPlayingController"), {"mac_address": self.bose_controller.mac_address})  # TODO: centralize controller logger management
 
         self.reset_now_playing()
+        self.bose_controller.bose_thread.write(audiomanagement.NowPlayingStartPacket())
 
     @property
     def menu_items(self) -> List[Gtk.MenuItem]:
@@ -323,6 +335,7 @@ class DevicesController(Controller):
         self.logger = logging.LoggerAdapter(logging.getLogger("DevicesController"), {"mac_address": self.bose_controller.mac_address})  # TODO: centralize controller logger management
 
         self.device_names = {}
+        self.bose_controller.bose_thread.write(devicemanagement.ListDevicesGetPacket())
 
     def read_devices_status(self, packet: devicemanagement.ListDevicesStatusPacket):
         for mac_address in packet.mac_addresses:
@@ -358,6 +371,8 @@ class StatusSourceController(Controller):
         self.logger = logging.LoggerAdapter(logging.getLogger("StatusSourceController"), {"mac_address": self.bose_controller.mac_address})  # TODO: centralize controller logger management
 
         self.source_mac_address = None
+        self.bose_controller.bose_thread.write(audiomanagement.SourceGetPacket())
+        self.bose_controller.bose_thread.write(audiomanagement.StatusGetPacket())
 
     @property
     def menu_items(self) -> List[Gtk.MenuItem]:
@@ -439,6 +454,9 @@ class BoseController:
 
         self.packet_dispatcher = PacketDispatcher()
 
+        self.bose_thread = BoseThread(self.mac_address, 8, self.packet_dispatcher)
+        self.bose_thread.setDaemon(True)
+
         self.indicator = self.get_indicator(mac_address)
         self.indicator.set_title("openbose")
         self.indicator.set_status(AppIndicator3.IndicatorStatus.ACTIVE)
@@ -480,8 +498,6 @@ class BoseController:
         self.now_playing_controller.reset_now_playing()  # TODO: remove, required because show_all would override hide in controller init
 
     def connect(self):
-        self.bose_thread = BoseThread(self.mac_address, 8, self.packet_dispatcher)
-        self.bose_thread.setDaemon(True)
         self.bose_thread.start()
 
 
