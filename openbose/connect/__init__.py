@@ -112,6 +112,49 @@ class Controller:
         return []
 
 
+class ConnectionController(Controller):
+    item_name: TextMenuItem
+    notification_connect: MyNotification
+    notification_disconnect: MyNotification
+
+    def __init__(self, bose_controller: "BoseController") -> None:
+        super().__init__(bose_controller)
+
+        self.item_name = TextMenuItem(label="?")
+        self.notification_connect = MyNotification("openbose", "Connected", "audio-headphones")
+        self.notification_connect.set_category("device.added")
+        self.notification_disconnect = MyNotification("openbose", "Disconnected", "audio-headphones")
+        self.notification_disconnect.set_category("device.removed")
+
+        self.bose_controller.packet_dispatcher.add(settings.ProductNameStatusPacket, self.read_product_name_status)
+        self.bose_controller.packet_dispatcher.add(devicemanagement.DisconnectProcessingPacket, self.read_disconnect_processing)
+
+        self.logger = logging.LoggerAdapter(logging.getLogger("ConnectionController"), {"mac_address": self.bose_controller.mac_address})  # TODO: centralize controller logger management
+
+    @property
+    def menu_items(self) -> List[Gtk.MenuItem]:
+        return [self.item_name]
+
+    def read_product_name_status(self, packet: settings.ProductNameStatusPacket):
+        name = packet.product_name
+        s = name
+        self.logger.info(s)
+        self.bose_controller.indicator.set_title(s)
+        self.item_name.set_label(s)
+        self.bose_controller.volume_controller.notification_volume.set_summary(s)  # TODO: centralize controller name management
+        self.bose_controller.battery_level_controller.notification_battery_level.set_summary(s)
+        self.notification_connect.set_summary(s)
+        self.notification_disconnect.set_summary(s)
+        self.bose_controller.status_source_controller.notification_source.set_summary(s)
+        self.bose_controller.status_source_controller.notification_status.set_summary(s)
+        self.bose_controller.now_playing_controller.notification_now_playing.set_summary(s)
+
+        self.notification_connect.show()
+
+    def read_disconnect_processing(self, packet: devicemanagement.DisconnectProcessingPacket):
+        self.notification_disconnect.show()
+        self.bose_controller.indicator.set_status(AppIndicator3.IndicatorStatus.PASSIVE)
+
 class BatteryLevelController(Controller):
     item_battery: TextIconMenuItem  # TODO: rename to item_battery_level?
     notification_battery_level: MyNotification
@@ -367,14 +410,11 @@ class BoseController:
     indicator: AppIndicator3.Indicator
 
     menu: Gtk.Menu
-    item_name: TextMenuItem
-
-    notification_connect: MyNotification
-    notification_disconnect: MyNotification
 
     bose_thread: BoseThread
 
     packet_dispatcher: PacketDispatcher
+    connection_controller: ConnectionController
     volume_controller: VolumeController
     battery_level_controller: BatteryLevelController
     now_playing_controller: NowPlayingController
@@ -409,8 +449,8 @@ class BoseController:
             for item in items:
                 self.menu.append(item)
 
-        self.item_name = TextMenuItem(label="?")
-        self.menu.append(self.item_name)
+        self.connection_controller = ConnectionController(self)
+        menu_append_all(self.connection_controller.menu_items)
 
         self.battery_level_controller = BatteryLevelController(self)
         menu_append_all(self.battery_level_controller.menu_items)
@@ -433,39 +473,11 @@ class BoseController:
         self.menu.show_all()
         self.indicator.set_menu(self.menu)
 
-        self.notification_connect = MyNotification("openbose", "Connected", "audio-headphones")
-        self.notification_connect.set_category("device.added")
-        self.notification_disconnect = MyNotification("openbose", "Disconnected", "audio-headphones")
-        self.notification_disconnect.set_category("device.removed")
-
         self.devices_controller = DevicesController(self)
-
-        self.packet_dispatcher.add(settings.ProductNameStatusPacket, self.read_product_name_status)
-        self.packet_dispatcher.add(devicemanagement.DisconnectProcessingPacket, self.read_disconnect_processing)
 
         self.logger = logging.LoggerAdapter(logging.getLogger("BoseController"), {"mac_address": mac_address})
 
         self.now_playing_controller.reset_now_playing()  # TODO: remove, required because show_all would override hide in controller init
-
-    def read_product_name_status(self, packet: settings.ProductNameStatusPacket):
-        name = packet.product_name
-        s = name
-        self.logger.info(s)
-        self.indicator.set_title(s)
-        self.item_name.set_label(s)
-        self.volume_controller.notification_volume.set_summary(s)  # TODO: centralize controller name management
-        self.battery_level_controller.notification_battery_level.set_summary(s)
-        self.notification_connect.set_summary(s)
-        self.notification_disconnect.set_summary(s)
-        self.status_source_controller.notification_source.set_summary(s)
-        self.status_source_controller.notification_status.set_summary(s)
-        self.now_playing_controller.notification_now_playing.set_summary(s)
-
-        self.notification_connect.show()
-
-    def read_disconnect_processing(self, packet: devicemanagement.DisconnectProcessingPacket):
-        self.notification_disconnect.show()
-        self.indicator.set_status(AppIndicator3.IndicatorStatus.PASSIVE)
 
     def connect(self):
         self.bose_thread = BoseThread(self.mac_address, 8, self.packet_dispatcher)
