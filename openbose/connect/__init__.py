@@ -1,5 +1,5 @@
 import collections
-from typing import Optional
+from typing import Optional, List
 
 import gi
 
@@ -101,6 +101,60 @@ class PacketDispatcher(PacketHandler):
             callback(packet)
 
 
+class Controller:
+    bose_controller: "BoseController"
+
+    def __init__(self, bose_controller: "BoseController") -> None:
+        self.bose_controller = bose_controller
+
+    @property
+    def menu_items(self) -> List[Gtk.MenuItem]:
+        return []
+
+
+class VolumeController(Controller):
+    item_volume: TextIconMenuItem
+    notification_volume: GaugeNotification
+
+    def __init__(self, bose_controller: "BoseController") -> None:
+        super().__init__(bose_controller)
+
+        self.item_volume = TextIconMenuItem(label="Volume: ?", icon_name="audio-volume-off")
+        self.notification_volume = GaugeNotification("openbose", None, "audio-headphones")
+        self.notification_volume.set_category("device")
+        self.notification_volume.set_transient(True)
+
+        self.bose_controller.packet_dispatcher.add(audiomanagement.VolumeStatusPacket, self.read_volume_status)
+
+        self.logger = logging.LoggerAdapter(logging.getLogger("VolumeController"), {"mac_address": self.bose_controller.mac_address})  # TODO: centralize controller logger management
+
+    @property
+    def menu_items(self) -> List[Gtk.MenuItem]:
+        return [self.item_volume]
+
+    def read_volume_status(self, packet: audiomanagement.VolumeStatusPacket):
+        max_volume = packet.max_volume
+        cur_volume = packet.cur_volume
+        volume_percent = round(cur_volume / max_volume * 100)
+        s = f"Volume: {volume_percent}% ({str(cur_volume)}/{str(max_volume)})"
+        self.logger.info(s)
+        self.item_volume.set_label(s)
+        self.notification_volume.set_body(s)  # just in case if notifyd doesn't support value
+        self.notification_volume.set_value(volume_percent)
+        self.notification_volume.show()
+
+        icon_name = None
+        if volume_percent >= 2 / 3 * 100:
+            icon_name = "audio-volume-high"
+        elif volume_percent >= 1 / 3 * 100:
+            icon_name = "audio-volume-medium"
+        elif volume_percent > 0 / 3 * 100:
+            icon_name = "audio-volume-low"
+        else:
+            icon_name = "audio-volume-muted"
+        self.item_volume.set_icon(icon_name)
+
+
 class BoseController:
     mac_address: str
 
@@ -110,12 +164,10 @@ class BoseController:
     item_name: TextMenuItem
     item_battery: TextIconMenuItem
     item_status_source: TextMenuItem
-    item_volume: TextIconMenuItem
     item_title: TextMenuItem
     item_artist: TextMenuItem
     item_album: TextMenuItem
 
-    notification_volume: GaugeNotification
     notification_battery_level: MyNotification
     notification_connect: MyNotification
     notification_disconnect: MyNotification
@@ -126,6 +178,7 @@ class BoseController:
     bose_thread: BoseThread
 
     packet_dispatcher: PacketDispatcher
+    volume_controller: VolumeController
 
     device_names: Dict[str, Optional[str]]
     source_mac_address: Optional[str]
@@ -147,6 +200,8 @@ class BoseController:
     def __init__(self, mac_address: str):
         self.mac_address = mac_address
 
+        self.packet_dispatcher = PacketDispatcher()
+
         self.indicator = self.get_indicator(mac_address)
         self.indicator.set_title("openbose")
         self.indicator.set_status(AppIndicator3.IndicatorStatus.ACTIVE)
@@ -158,8 +213,14 @@ class BoseController:
         self.menu.append(self.item_battery)
         self.item_status_source = TextIconMenuItem(label="Source: ?", icon_name="gnome-unknown")  # TODO: don't use DE-specific icon?
         self.menu.append(self.item_status_source)
-        self.item_volume = TextIconMenuItem(label="Volume: ?", icon_name="audio-volume-off")
-        self.menu.append(self.item_volume)
+
+        def menu_append_all(items: List[Gtk.MenuItem]):
+            for item in items:
+                self.menu.append(item)
+
+        self.volume_controller = VolumeController(self)
+        menu_append_all(self.volume_controller.menu_items)
+
         self.menu.append(Gtk.SeparatorMenuItem())
         self.item_title = TextMenuItem(label="Title: ?")
         self.menu.append(self.item_title)
@@ -174,9 +235,6 @@ class BoseController:
         self.menu.show_all()
         self.indicator.set_menu(self.menu)
 
-        self.notification_volume = GaugeNotification("openbose", None, "audio-headphones")
-        self.notification_volume.set_category("device")
-        self.notification_volume.set_transient(True)
         self.notification_battery_level = MyNotification("openbose", None, "audio-headphones")
         self.notification_battery_level.set_category("device")
         self.notification_connect = MyNotification("openbose", "Connected", "audio-headphones")
@@ -190,11 +248,8 @@ class BoseController:
         self.notification_now_playing = MyNotification("openbose", None, "audio-headphones")
         self.notification_now_playing.set_category("device")
 
-        self.packet_dispatcher = PacketDispatcher()
-
         self.packet_dispatcher.add(settings.ProductNameStatusPacket, self.read_product_name_status)
         self.packet_dispatcher.add(status.BatteryLevelStatusPacket, self.read_battery_level_status)
-        self.packet_dispatcher.add(audiomanagement.VolumeStatusPacket, self.read_volume_status)
         self.packet_dispatcher.add(devicemanagement.DisconnectProcessingPacket, self.read_disconnect_processing)
         self.packet_dispatcher.add(devicemanagement.ListDevicesStatusPacket, self.read_devices_status)
         self.packet_dispatcher.add(devicemanagement.InfoStatusPacket, self.read_info_status)
@@ -217,7 +272,7 @@ class BoseController:
         self.logger.info(s)
         self.indicator.set_title(s)
         self.item_name.set_label(s)
-        self.notification_volume.set_summary(s)
+        self.volume_controller.notification_volume.set_summary(s)  # TODO: centralize controller name management
         self.notification_battery_level.set_summary(s)
         self.notification_connect.set_summary(s)
         self.notification_disconnect.set_summary(s)
@@ -249,28 +304,6 @@ class BoseController:
         else:
             icon_name = "battery-000"
         self.item_battery.set_icon(icon_name)
-
-    def read_volume_status(self, packet: audiomanagement.VolumeStatusPacket):
-        max_volume = packet.max_volume
-        cur_volume = packet.cur_volume
-        volume_percent = round(cur_volume / max_volume * 100)
-        s = f"Volume: {volume_percent}% ({str(cur_volume)}/{str(max_volume)})"
-        self.logger.info(s)
-        self.item_volume.set_label(s)
-        self.notification_volume.set_body(s)  # just in case if notifyd doesn't support value
-        self.notification_volume.set_value(volume_percent)
-        self.notification_volume.show()
-
-        icon_name = None
-        if volume_percent >= 2 / 3 * 100:
-            icon_name = "audio-volume-high"
-        elif volume_percent >= 1 / 3 * 100:
-            icon_name = "audio-volume-medium"
-        elif volume_percent > 0 / 3 * 100:
-            icon_name = "audio-volume-low"
-        else:
-            icon_name = "audio-volume-muted"
-        self.item_volume.set_icon(icon_name)
 
     def read_disconnect_processing(self, packet: devicemanagement.DisconnectProcessingPacket):
         self.notification_disconnect.show()
