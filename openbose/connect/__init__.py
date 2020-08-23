@@ -509,7 +509,7 @@ DEVICE_INTERFACE = "org.bluez.Device1"
 SPP_UUID = "00001101-0000-1000-8000-00805f9b34fb"
 
 with open("config.yml", "r", encoding="utf-8") as config_file:
-    config = yaml.load(config_file)
+    config = yaml.safe_load(config_file)
 
 bose_devices = config["devices"]
 
