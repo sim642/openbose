@@ -2,19 +2,19 @@ import collections
 from typing import Optional, List
 
 import gi
+gi.require_version("Gtk", "3.0")
+gi.require_version("AppIndicator3", "0.1")
+gi.require_version("Notify", "0.7")
 
 from openbose.connect.gtk import TextMenuItem, TextIconMenuItem
 from openbose.connect.notification import MyNotification, GaugeNotification
 
 from openbose.packets import productinfo, settings, status, audiomanagement, devicemanagement
 
-gi.require_version("Gtk", "3.0")
 from gi.repository import Gtk
-gi.require_version("AppIndicator3", "0.1")
 from gi.repository import AppIndicator3
 
 from gi.repository import GLib
-gi.require_version("Notify", "0.7")
 from gi.repository import Notify
 
 import dbus
