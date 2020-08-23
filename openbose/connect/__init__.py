@@ -112,6 +112,49 @@ class Controller:
         return []
 
 
+class BatteryLevelController(Controller):
+    item_battery: TextIconMenuItem  # TODO: rename to item_battery_level?
+    notification_battery_level: MyNotification
+
+    def __init__(self, bose_controller: "BoseController") -> None:
+        super().__init__(bose_controller)
+
+        self.item_battery = TextIconMenuItem(label="Battery level: ?", icon_name="battery-missing")
+        self.notification_battery_level = MyNotification("openbose", None, "audio-headphones")
+        self.notification_battery_level.set_category("device")
+
+        self.bose_controller.packet_dispatcher.add(status.BatteryLevelStatusPacket, self.read_battery_level_status)
+
+        self.logger = logging.LoggerAdapter(logging.getLogger("BatteryLevelController"), {"mac_address": self.bose_controller.mac_address})  # TODO: centralize controller logger management
+
+    @property
+    def menu_items(self) -> List[Gtk.MenuItem]:
+        return [self.item_battery]
+
+    def read_battery_level_status(self, packet: status.BatteryLevelStatusPacket):
+        battery_level = packet.battery_level
+        s = f"Battery level: {str(battery_level)}%"
+        self.logger.info(s)
+        self.item_battery.set_label(s)
+        self.notification_battery_level.set_body(s)
+        self.notification_battery_level.show()
+
+        icon_name = None
+        if battery_level >= 90:
+            icon_name = "battery-100"
+        elif battery_level >= 70:
+            icon_name = "battery-080"
+        elif battery_level >= 50:
+            icon_name = "battery-060"
+        elif battery_level >= 30:
+            icon_name = "battery-040"
+        elif battery_level >= 10:
+            icon_name = "battery-020"
+        else:
+            icon_name = "battery-000"
+        self.item_battery.set_icon(icon_name)
+
+
 class VolumeController(Controller):
     item_volume: TextIconMenuItem
     notification_volume: GaugeNotification
@@ -162,13 +205,11 @@ class BoseController:
 
     menu: Gtk.Menu
     item_name: TextMenuItem
-    item_battery: TextIconMenuItem
     item_status_source: TextMenuItem
     item_title: TextMenuItem
     item_artist: TextMenuItem
     item_album: TextMenuItem
 
-    notification_battery_level: MyNotification
     notification_connect: MyNotification
     notification_disconnect: MyNotification
     notification_source: MyNotification
@@ -179,6 +220,7 @@ class BoseController:
 
     packet_dispatcher: PacketDispatcher
     volume_controller: VolumeController
+    battery_level_controller: BatteryLevelController
 
     device_names: Dict[str, Optional[str]]
     source_mac_address: Optional[str]
@@ -207,16 +249,19 @@ class BoseController:
         self.indicator.set_status(AppIndicator3.IndicatorStatus.ACTIVE)
 
         self.menu = Gtk.Menu()
-        self.item_name = TextMenuItem(label="?")
-        self.menu.append(self.item_name)
-        self.item_battery = TextIconMenuItem(label="Battery level: ?", icon_name="battery-missing")
-        self.menu.append(self.item_battery)
-        self.item_status_source = TextIconMenuItem(label="Source: ?", icon_name="gnome-unknown")  # TODO: don't use DE-specific icon?
-        self.menu.append(self.item_status_source)
 
         def menu_append_all(items: List[Gtk.MenuItem]):
             for item in items:
                 self.menu.append(item)
+
+        self.item_name = TextMenuItem(label="?")
+        self.menu.append(self.item_name)
+
+        self.battery_level_controller = BatteryLevelController(self)
+        menu_append_all(self.battery_level_controller.menu_items)
+
+        self.item_status_source = TextIconMenuItem(label="Source: ?", icon_name="gnome-unknown")  # TODO: don't use DE-specific icon?
+        self.menu.append(self.item_status_source)
 
         self.volume_controller = VolumeController(self)
         menu_append_all(self.volume_controller.menu_items)
@@ -235,8 +280,6 @@ class BoseController:
         self.menu.show_all()
         self.indicator.set_menu(self.menu)
 
-        self.notification_battery_level = MyNotification("openbose", None, "audio-headphones")
-        self.notification_battery_level.set_category("device")
         self.notification_connect = MyNotification("openbose", "Connected", "audio-headphones")
         self.notification_connect.set_category("device.added")
         self.notification_disconnect = MyNotification("openbose", "Disconnected", "audio-headphones")
@@ -249,7 +292,6 @@ class BoseController:
         self.notification_now_playing.set_category("device")
 
         self.packet_dispatcher.add(settings.ProductNameStatusPacket, self.read_product_name_status)
-        self.packet_dispatcher.add(status.BatteryLevelStatusPacket, self.read_battery_level_status)
         self.packet_dispatcher.add(devicemanagement.DisconnectProcessingPacket, self.read_disconnect_processing)
         self.packet_dispatcher.add(devicemanagement.ListDevicesStatusPacket, self.read_devices_status)
         self.packet_dispatcher.add(devicemanagement.InfoStatusPacket, self.read_info_status)
@@ -273,7 +315,7 @@ class BoseController:
         self.indicator.set_title(s)
         self.item_name.set_label(s)
         self.volume_controller.notification_volume.set_summary(s)  # TODO: centralize controller name management
-        self.notification_battery_level.set_summary(s)
+        self.battery_level_controller.notification_battery_level.set_summary(s)
         self.notification_connect.set_summary(s)
         self.notification_disconnect.set_summary(s)
         self.notification_source.set_summary(s)
@@ -281,29 +323,6 @@ class BoseController:
         self.notification_now_playing.set_summary(s)
 
         self.notification_connect.show()
-
-    def read_battery_level_status(self, packet: status.BatteryLevelStatusPacket):
-        battery_level = packet.battery_level
-        s = f"Battery level: {str(battery_level)}%"
-        self.logger.info(s)
-        self.item_battery.set_label(s)
-        self.notification_battery_level.set_body(s)
-        self.notification_battery_level.show()
-
-        icon_name = None
-        if battery_level >= 90:
-            icon_name = "battery-100"
-        elif battery_level >= 70:
-            icon_name = "battery-080"
-        elif battery_level >= 50:
-            icon_name = "battery-060"
-        elif battery_level >= 30:
-            icon_name = "battery-040"
-        elif battery_level >= 10:
-            icon_name = "battery-020"
-        else:
-            icon_name = "battery-000"
-        self.item_battery.set_icon(icon_name)
 
     def read_disconnect_processing(self, packet: devicemanagement.DisconnectProcessingPacket):
         self.notification_disconnect.show()
