@@ -268,6 +268,30 @@ class NowPlayingController(Controller):
             self.notification_now_playing.show()
 
 
+class DevicesController(Controller):
+    device_names: Dict[str, Optional[str]]
+
+    def __init__(self, bose_controller: "BoseController") -> None:
+        super().__init__(bose_controller)
+
+        self.bose_controller.packet_dispatcher.add(devicemanagement.ListDevicesStatusPacket, self.read_devices_status)
+        self.bose_controller.packet_dispatcher.add(devicemanagement.InfoStatusPacket, self.read_info_status)
+
+        self.logger = logging.LoggerAdapter(logging.getLogger("DevicesController"), {"mac_address": self.bose_controller.mac_address})  # TODO: centralize controller logger management
+
+        self.device_names = {}
+
+    def read_devices_status(self, packet: devicemanagement.ListDevicesStatusPacket):
+        for mac_address in packet.mac_addresses:
+            self.device_names[mac_address] = None
+            self.bose_controller.bose_thread.write(devicemanagement.InfoGetPacket(mac_address))
+
+    def read_info_status(self, packet: devicemanagement.InfoStatusPacket):
+        self.device_names[packet.mac_address] = packet.name
+        if packet.mac_address == self.bose_controller.source_mac_address:
+            self.bose_controller.show_source()
+
+
 class BoseController:
     mac_address: str
 
@@ -288,8 +312,8 @@ class BoseController:
     volume_controller: VolumeController
     battery_level_controller: BatteryLevelController
     now_playing_controller: NowPlayingController
+    devices_controller: DevicesController
 
-    device_names: Dict[str, Optional[str]]
     source_mac_address: Optional[str]
 
 
@@ -353,16 +377,15 @@ class BoseController:
         self.notification_status = MyNotification("openbose", None, "audio-headphones")
         self.notification_status.set_category("device")
 
+        self.devices_controller = DevicesController(self)
+
         self.packet_dispatcher.add(settings.ProductNameStatusPacket, self.read_product_name_status)
         self.packet_dispatcher.add(devicemanagement.DisconnectProcessingPacket, self.read_disconnect_processing)
-        self.packet_dispatcher.add(devicemanagement.ListDevicesStatusPacket, self.read_devices_status)
-        self.packet_dispatcher.add(devicemanagement.InfoStatusPacket, self.read_info_status)
         self.packet_dispatcher.add(audiomanagement.SourceStatusPacket, self.read_source_status)
         self.packet_dispatcher.add(audiomanagement.StatusStatusPacket, self.read_status_status)
 
         self.logger = logging.LoggerAdapter(logging.getLogger("BoseController"), {"mac_address": mac_address})
 
-        self.device_names = {}
         self.source_mac_address = None
 
         self.now_playing_controller.reset_now_playing()  # TODO: remove, required because show_all would override hide in controller init
@@ -387,16 +410,6 @@ class BoseController:
         self.notification_disconnect.show()
         self.indicator.set_status(AppIndicator3.IndicatorStatus.PASSIVE)
 
-    def read_devices_status(self, packet: devicemanagement.ListDevicesStatusPacket):
-        for mac_address in packet.mac_addresses:
-            self.device_names[mac_address] = None
-            self.bose_thread.write(devicemanagement.InfoGetPacket(mac_address))
-
-    def read_info_status(self, packet: devicemanagement.InfoStatusPacket):
-        self.device_names[packet.mac_address] = packet.name
-        if packet.mac_address == self.source_mac_address:
-            self.show_source()
-
     def read_source_status(self, packet: audiomanagement.SourceStatusPacket):
         self.source_mac_address = packet.mac_address
         self.show_source()
@@ -406,7 +419,7 @@ class BoseController:
 
     def show_source(self):
         mac_address = self.source_mac_address
-        source = self.device_names.get(mac_address, mac_address)
+        source = self.devices_controller.device_names.get(mac_address, mac_address)
         s = f"Source: {source}"
         self.logger.info(s)
         self.item_status_source.set_label(s)
