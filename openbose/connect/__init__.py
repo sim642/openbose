@@ -288,8 +288,77 @@ class DevicesController(Controller):
 
     def read_info_status(self, packet: devicemanagement.InfoStatusPacket):
         self.device_names[packet.mac_address] = packet.name
-        if packet.mac_address == self.bose_controller.source_mac_address:
-            self.bose_controller.show_source()
+        if packet.mac_address == self.bose_controller.status_source_controller.source_mac_address:
+            self.bose_controller.status_source_controller.show_source()
+
+
+# combined because menu item is combined
+class StatusSourceController(Controller):
+    item_status_source: TextMenuItem
+    notification_source: MyNotification
+    notification_status: MyNotification
+
+    source_mac_address: Optional[str]
+
+    def __init__(self, bose_controller: "BoseController") -> None:
+        super().__init__(bose_controller)
+
+        self.item_status_source = TextIconMenuItem(label="Source: ?", icon_name="gnome-unknown")  # TODO: don't use DE-specific icon?
+        self.notification_source = MyNotification("openbose", None, "audio-headphones")
+        self.notification_source.set_category("device")
+        self.notification_status = MyNotification("openbose", None, "audio-headphones")
+        self.notification_status.set_category("device")
+
+        self.bose_controller.packet_dispatcher.add(audiomanagement.SourceStatusPacket, self.read_source_status)
+        self.bose_controller.packet_dispatcher.add(audiomanagement.StatusStatusPacket, self.read_status_status)
+
+        self.logger = logging.LoggerAdapter(logging.getLogger("StatusSourceController"), {"mac_address": self.bose_controller.mac_address})  # TODO: centralize controller logger management
+
+        self.source_mac_address = None
+
+    @property
+    def menu_items(self) -> List[Gtk.MenuItem]:
+        return [self.item_status_source]
+
+    def read_source_status(self, packet: audiomanagement.SourceStatusPacket):
+        self.source_mac_address = packet.mac_address
+        self.show_source()
+        # update audio status because different source may have different one (or not report any)
+        self.bose_controller.bose_thread.write(audiomanagement.StatusGetPacket())
+        self.bose_controller.bose_thread.write(audiomanagement.NowPlayingStartPacket())
+        # TODO: move these into different controllers?
+
+    def show_source(self):
+        mac_address = self.source_mac_address
+        source = self.bose_controller.devices_controller.device_names.get(mac_address, mac_address)
+        s = f"Source: {source}"
+        self.logger.info(s)
+        self.item_status_source.set_label(s)
+        self.notification_source.set_body(s)
+        self.notification_source.show()
+
+    def read_status_status(self, packet: audiomanagement.StatusStatusPacket):
+        icon_name = None
+        status_name = None
+        if packet.status == audiomanagement.Status.STOP:
+            icon_name = "media-playback-stop"
+            status_name = "stopped"
+        elif packet.status == audiomanagement.Status.PLAY:
+            icon_name = "media-playback-start"
+            status_name = "playing"
+        elif packet.status == audiomanagement.Status.PAUSE:
+            icon_name = "media-playback-pause"
+            status_name = "paused"
+        else:
+            icon_name = "gnome-unknown"  # TODO: don't use DE-specific icon?
+            status_name = repr(packet.status)
+
+        s = f"Status: {status_name}"
+        self.logger.info(s)
+
+        self.item_status_source.set_icon(icon_name)
+        self.notification_status.set_body(s)
+        self.notification_status.show()
 
 
 class BoseController:
@@ -299,12 +368,9 @@ class BoseController:
 
     menu: Gtk.Menu
     item_name: TextMenuItem
-    item_status_source: TextMenuItem
 
     notification_connect: MyNotification
     notification_disconnect: MyNotification
-    notification_source: MyNotification
-    notification_status: MyNotification
 
     bose_thread: BoseThread
 
@@ -313,8 +379,7 @@ class BoseController:
     battery_level_controller: BatteryLevelController
     now_playing_controller: NowPlayingController
     devices_controller: DevicesController
-
-    source_mac_address: Optional[str]
+    status_source_controller: StatusSourceController
 
 
     INDICATORS: Dict[str, AppIndicator3.Indicator] = {}
@@ -350,8 +415,8 @@ class BoseController:
         self.battery_level_controller = BatteryLevelController(self)
         menu_append_all(self.battery_level_controller.menu_items)
 
-        self.item_status_source = TextIconMenuItem(label="Source: ?", icon_name="gnome-unknown")  # TODO: don't use DE-specific icon?
-        self.menu.append(self.item_status_source)
+        self.status_source_controller = StatusSourceController(self)
+        menu_append_all(self.status_source_controller.menu_items)
 
         self.volume_controller = VolumeController(self)
         menu_append_all(self.volume_controller.menu_items)
@@ -372,21 +437,13 @@ class BoseController:
         self.notification_connect.set_category("device.added")
         self.notification_disconnect = MyNotification("openbose", "Disconnected", "audio-headphones")
         self.notification_disconnect.set_category("device.removed")
-        self.notification_source = MyNotification("openbose", None, "audio-headphones")
-        self.notification_source.set_category("device")
-        self.notification_status = MyNotification("openbose", None, "audio-headphones")
-        self.notification_status.set_category("device")
 
         self.devices_controller = DevicesController(self)
 
         self.packet_dispatcher.add(settings.ProductNameStatusPacket, self.read_product_name_status)
         self.packet_dispatcher.add(devicemanagement.DisconnectProcessingPacket, self.read_disconnect_processing)
-        self.packet_dispatcher.add(audiomanagement.SourceStatusPacket, self.read_source_status)
-        self.packet_dispatcher.add(audiomanagement.StatusStatusPacket, self.read_status_status)
 
         self.logger = logging.LoggerAdapter(logging.getLogger("BoseController"), {"mac_address": mac_address})
-
-        self.source_mac_address = None
 
         self.now_playing_controller.reset_now_playing()  # TODO: remove, required because show_all would override hide in controller init
 
@@ -400,8 +457,8 @@ class BoseController:
         self.battery_level_controller.notification_battery_level.set_summary(s)
         self.notification_connect.set_summary(s)
         self.notification_disconnect.set_summary(s)
-        self.notification_source.set_summary(s)
-        self.notification_status.set_summary(s)
+        self.status_source_controller.notification_source.set_summary(s)
+        self.status_source_controller.notification_status.set_summary(s)
         self.now_playing_controller.notification_now_playing.set_summary(s)
 
         self.notification_connect.show()
@@ -409,45 +466,6 @@ class BoseController:
     def read_disconnect_processing(self, packet: devicemanagement.DisconnectProcessingPacket):
         self.notification_disconnect.show()
         self.indicator.set_status(AppIndicator3.IndicatorStatus.PASSIVE)
-
-    def read_source_status(self, packet: audiomanagement.SourceStatusPacket):
-        self.source_mac_address = packet.mac_address
-        self.show_source()
-        # update audio status because different source may have different one (or not report any)
-        self.bose_thread.write(audiomanagement.StatusGetPacket())
-        self.bose_thread.write(audiomanagement.NowPlayingStartPacket())
-
-    def show_source(self):
-        mac_address = self.source_mac_address
-        source = self.devices_controller.device_names.get(mac_address, mac_address)
-        s = f"Source: {source}"
-        self.logger.info(s)
-        self.item_status_source.set_label(s)
-        self.notification_source.set_body(s)
-        self.notification_source.show()
-
-    def read_status_status(self, packet: audiomanagement.StatusStatusPacket):
-        icon_name = None
-        status_name = None
-        if packet.status == audiomanagement.Status.STOP:
-            icon_name = "media-playback-stop"
-            status_name = "stopped"
-        elif packet.status == audiomanagement.Status.PLAY:
-            icon_name = "media-playback-start"
-            status_name = "playing"
-        elif packet.status == audiomanagement.Status.PAUSE:
-            icon_name = "media-playback-pause"
-            status_name = "paused"
-        else:
-            icon_name = "gnome-unknown"  # TODO: don't use DE-specific icon?
-            status_name = repr(packet.status)
-
-        s = f"Status: {status_name}"
-        self.logger.info(s)
-
-        self.item_status_source.set_icon(icon_name)
-        self.notification_status.set_body(s)
-        self.notification_status.show()
 
     def connect(self):
         self.bose_thread = BoseThread(self.mac_address, 8, self.packet_dispatcher)
