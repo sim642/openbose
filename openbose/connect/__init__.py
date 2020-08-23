@@ -198,6 +198,76 @@ class VolumeController(Controller):
         self.item_volume.set_icon(icon_name)
 
 
+class NowPlayingController(Controller):
+    item_title: TextMenuItem
+    item_artist: TextMenuItem
+    item_album: TextMenuItem
+    notification_now_playing: MyNotification
+
+    now_playing: Dict[audiomanagement.NowPlayingAttribute, str]
+
+    def __init__(self, bose_controller: "BoseController") -> None:
+        super().__init__(bose_controller)
+
+        self.item_title = TextMenuItem(label="Title: ?")
+        self.item_artist = TextMenuItem(label="Artist: ?")
+        self.item_album = TextMenuItem(label="Album: ?")
+        self.notification_now_playing = MyNotification("openbose", None, "audio-headphones")
+        self.notification_now_playing.set_category("device")
+
+        self.bose_controller.packet_dispatcher.add(audiomanagement.NowPlayingStatusPacket, self.read_now_playing_status)
+        self.bose_controller.packet_dispatcher.add(audiomanagement.NowPlayingProcessingPacket, self.read_now_playing_processing)
+        self.bose_controller.packet_dispatcher.add(audiomanagement.NowPlayingResultPacket, self.read_now_playing_result)
+
+        self.logger = logging.LoggerAdapter(logging.getLogger("NowPlayingController"), {"mac_address": self.bose_controller.mac_address})  # TODO: centralize controller logger management
+
+        self.reset_now_playing()
+
+    @property
+    def menu_items(self) -> List[Gtk.MenuItem]:
+        return [self.item_title, self.item_artist, self.item_album]
+
+    def read_now_playing_status(self, packet: audiomanagement.NowPlayingStatusPacket):
+        s = f"Now playing: {packet.attribute!r}: {packet.value}"
+        self.logger.info(s)
+
+        if packet.attribute == audiomanagement.NowPlayingAttribute.SONG_TITLE:
+            self.item_title.set_label(f"Title: {packet.value}")
+            self.item_title.show()
+        elif packet.attribute == audiomanagement.NowPlayingAttribute.ARTIST:
+            self.item_artist.set_label(f"Artist: {packet.value}")
+            self.item_artist.show()
+        elif packet.attribute == audiomanagement.NowPlayingAttribute.ALBUM:
+            self.item_album.set_label(f"Album: {packet.value}")
+            self.item_album.show()
+
+        self.now_playing[packet.attribute] = packet.value
+
+    def reset_now_playing(self):
+        self.now_playing = {}
+        self.item_title.hide()
+        self.item_artist.hide()
+        self.item_album.hide()
+
+    def read_now_playing_processing(self, packet: audiomanagement.NowPlayingProcessingPacket):
+        self.reset_now_playing()
+
+    def read_now_playing_result(self, packet: audiomanagement.NowPlayingProcessingPacket):
+        ss = []
+        if audiomanagement.NowPlayingAttribute.SONG_TITLE in self.now_playing:
+            ss.append(f"Title: {self.now_playing[audiomanagement.NowPlayingAttribute.SONG_TITLE]}")
+        if audiomanagement.NowPlayingAttribute.ARTIST in self.now_playing:
+            ss.append(f"Artist: {self.now_playing[audiomanagement.NowPlayingAttribute.ARTIST]}")
+        if audiomanagement.NowPlayingAttribute.ALBUM in self.now_playing:
+            ss.append(f"Album: {self.now_playing[audiomanagement.NowPlayingAttribute.ALBUM]}")
+
+        if ss:
+            s = "\n".join(ss)
+            self.logger.info(s)
+            self.notification_now_playing.set_body(s)
+            self.notification_now_playing.show()
+
+
 class BoseController:
     mac_address: str
 
@@ -206,26 +276,22 @@ class BoseController:
     menu: Gtk.Menu
     item_name: TextMenuItem
     item_status_source: TextMenuItem
-    item_title: TextMenuItem
-    item_artist: TextMenuItem
-    item_album: TextMenuItem
 
     notification_connect: MyNotification
     notification_disconnect: MyNotification
     notification_source: MyNotification
     notification_status: MyNotification
-    notification_now_playing: MyNotification
 
     bose_thread: BoseThread
 
     packet_dispatcher: PacketDispatcher
     volume_controller: VolumeController
     battery_level_controller: BatteryLevelController
+    now_playing_controller: NowPlayingController
 
     device_names: Dict[str, Optional[str]]
     source_mac_address: Optional[str]
 
-    now_playing: Dict[audiomanagement.NowPlayingAttribute, str]
 
     INDICATORS: Dict[str, AppIndicator3.Indicator] = {}
 
@@ -267,12 +333,10 @@ class BoseController:
         menu_append_all(self.volume_controller.menu_items)
 
         self.menu.append(Gtk.SeparatorMenuItem())
-        self.item_title = TextMenuItem(label="Title: ?")
-        self.menu.append(self.item_title)
-        self.item_artist = TextMenuItem(label="Artist: ?")
-        self.menu.append(self.item_artist)
-        self.item_album = TextMenuItem(label="Album: ?")
-        self.menu.append(self.item_album)
+
+        self.now_playing_controller = NowPlayingController(self)
+        menu_append_all(self.now_playing_controller.menu_items)
+
         self.menu.append(Gtk.SeparatorMenuItem())
         item_quit = Gtk.MenuItem(label="Quit")
         item_quit.connect("activate", lambda _: quit())
@@ -288,8 +352,6 @@ class BoseController:
         self.notification_source.set_category("device")
         self.notification_status = MyNotification("openbose", None, "audio-headphones")
         self.notification_status.set_category("device")
-        self.notification_now_playing = MyNotification("openbose", None, "audio-headphones")
-        self.notification_now_playing.set_category("device")
 
         self.packet_dispatcher.add(settings.ProductNameStatusPacket, self.read_product_name_status)
         self.packet_dispatcher.add(devicemanagement.DisconnectProcessingPacket, self.read_disconnect_processing)
@@ -297,16 +359,13 @@ class BoseController:
         self.packet_dispatcher.add(devicemanagement.InfoStatusPacket, self.read_info_status)
         self.packet_dispatcher.add(audiomanagement.SourceStatusPacket, self.read_source_status)
         self.packet_dispatcher.add(audiomanagement.StatusStatusPacket, self.read_status_status)
-        self.packet_dispatcher.add(audiomanagement.NowPlayingStatusPacket, self.read_now_playing_status)
-        self.packet_dispatcher.add(audiomanagement.NowPlayingProcessingPacket, self.read_now_playing_processing)
-        self.packet_dispatcher.add(audiomanagement.NowPlayingResultPacket, self.read_now_playing_result)
 
         self.logger = logging.LoggerAdapter(logging.getLogger("BoseController"), {"mac_address": mac_address})
 
         self.device_names = {}
         self.source_mac_address = None
 
-        self.reset_now_playing()
+        self.now_playing_controller.reset_now_playing()  # TODO: remove, required because show_all would override hide in controller init
 
     def read_product_name_status(self, packet: settings.ProductNameStatusPacket):
         name = packet.product_name
@@ -320,7 +379,7 @@ class BoseController:
         self.notification_disconnect.set_summary(s)
         self.notification_source.set_summary(s)
         self.notification_status.set_summary(s)
-        self.notification_now_playing.set_summary(s)
+        self.now_playing_controller.notification_now_playing.set_summary(s)
 
         self.notification_connect.show()
 
@@ -376,46 +435,6 @@ class BoseController:
         self.item_status_source.set_icon(icon_name)
         self.notification_status.set_body(s)
         self.notification_status.show()
-
-    def read_now_playing_status(self, packet: audiomanagement.NowPlayingStatusPacket):
-        s = f"Now playing: {packet.attribute!r}: {packet.value}"
-        self.logger.info(s)
-
-        if packet.attribute == audiomanagement.NowPlayingAttribute.SONG_TITLE:
-            self.item_title.set_label(f"Title: {packet.value}")
-            self.item_title.show()
-        elif packet.attribute == audiomanagement.NowPlayingAttribute.ARTIST:
-            self.item_artist.set_label(f"Artist: {packet.value}")
-            self.item_artist.show()
-        elif packet.attribute == audiomanagement.NowPlayingAttribute.ALBUM:
-            self.item_album.set_label(f"Album: {packet.value}")
-            self.item_album.show()
-
-        self.now_playing[packet.attribute] = packet.value
-
-    def reset_now_playing(self):
-        self.now_playing = {}
-        self.item_title.hide()
-        self.item_artist.hide()
-        self.item_album.hide()
-
-    def read_now_playing_processing(self, packet: audiomanagement.NowPlayingProcessingPacket):
-        self.reset_now_playing()
-
-    def read_now_playing_result(self, packet: audiomanagement.NowPlayingProcessingPacket):
-        ss = []
-        if audiomanagement.NowPlayingAttribute.SONG_TITLE in self.now_playing:
-            ss.append(f"Title: {self.now_playing[audiomanagement.NowPlayingAttribute.SONG_TITLE]}")
-        if audiomanagement.NowPlayingAttribute.ARTIST in self.now_playing:
-            ss.append(f"Artist: {self.now_playing[audiomanagement.NowPlayingAttribute.ARTIST]}")
-        if audiomanagement.NowPlayingAttribute.ALBUM in self.now_playing:
-            ss.append(f"Album: {self.now_playing[audiomanagement.NowPlayingAttribute.ALBUM]}")
-
-        if ss:
-            s = "\n".join(ss)
-            self.logger.info(s)
-            self.notification_now_playing.set_body(s)
-            self.notification_now_playing.show()
 
     def connect(self):
         self.bose_thread = BoseThread(self.mac_address, 8, self.packet_dispatcher)
